@@ -22,6 +22,10 @@ SETUPS = {
                        "Stock rose 8%+ in 20 days, beat Nifty by 10+ points, near its 1-year high, on 1.5x volume (any market)."),
     "tight_base": ("Tight base breakout",
                    "Uptrending stock stayed within an 8% range for 10 days, then closes above it on 1.5x volume, near its 1-year high."),
+    "base_any": ("Yardstick: buy any stock on a random day",
+                 "Not a setup. Buys any eligible stock on any day (every 10 days per stock) with the same stoploss and exits. A real setup must beat this."),
+    "base_up": ("Yardstick: buy any stock in an uptrend",
+                "Not a setup. Buys any eligible stock whose price is above its 50-day and 200-day averages, every 10 days per stock."),
 }
 
 
@@ -48,6 +52,7 @@ def signals(d):
     c, up = d["Close"], (d["Close"] > d["sma50"]) & (d["sma50"] > d["sma200"])
     rs = d["ret20"] - d["nret20"]
     return {
+        "base_any": d["eligible"], "base_up": up,
         "high_break": up & (d["near"] >= 0.95) & (c > d["hi20p"]) & (d["volx"] >= 2) & (c > d["Open"]),
         "pullback": up & (d["near"] >= 0.80) & (d["pull"] >= 0.04) & (c > d["Open"]) & (c > d["sma20"]) & (d["Low"] <= d["sma20"] * 1.01),
         "strong_weak_mkt": (d["nret20"] < 0) & (d["ret20"] >= 0.08) & (rs >= 0.10) & (d["near"] >= 0.90) & (c > d["sma50"]),
@@ -118,7 +123,7 @@ def main():
                 r = d.iloc[i]
                 row = dict(setup=key, stock=sym, signal_date=str(d.index[i].date()), entry_date=str(d.index[e].date()),
                            entry_price=round(o[e], 2), stoploss=round(o[e] - risk, 2), fwd_hi=r["fwd_hi"],
-                           reason=(f"{SETUPS[key][1]} On {d.index[i].date()} it closed at {c[i]:.1f}, {100 * (1 - r['near']):.1f}% below its "
+                           reason="" if key.startswith("base") else (f"{SETUPS[key][1]} On {d.index[i].date()} it closed at {c[i]:.1f}, {100 * (1 - r['near']):.1f}% below its "
                                    f"1-year high, on {r['volx']:.1f}x normal volume. 20-day change: stock {r['ret20']:+.0%}, market {r['nret20']:+.0%}."))
                 for kind in EXITS:
                     row[f"p_{kind}"], row[f"d_{kind}"] = sim(o, h, l, c, e, risk, kind, atr)
@@ -129,6 +134,8 @@ def main():
     T["first"] = pd.to_datetime(T["signal_date"]) < mid
     baseline = round((pd.concat(base) >= 0.10).mean() * 100, 1)
     out = []
+    T["year"] = pd.to_datetime(T["signal_date"]).dt.year
+    ref = {k: T[T["setup"] == "base_any"][f"p_{k}"].mean() for k in EXITS}
     for key, (label, desc) in SETUPS.items():
         s = T[T["setup"] == key]
         bm = round((s["fwd_hi"].dropna() >= 0.10).mean() * 100, 1) if len(s) else 0
@@ -136,11 +143,13 @@ def main():
             a, f, l = stats(s, kind), stats(s[s["first"]], kind), stats(s[~s["first"]], kind)
             out.append(dict(setup=key, label=label, desc=desc, exit=kind, exit_label=xl, **a,
                             first_profit=f["avg_profit"], first_trades=f["trades"], last_profit=l["avg_profit"],
-                            last_trades=l["trades"], big_move=bm, verdict=verdict(f, l)))
+                            last_trades=l["trades"], big_move=bm, verdict=verdict(f, l),
+                            edge=round(a["avg_profit"] - ref[kind], 2),
+                            by_year={int(y): round(g[f"p_{kind}"].mean(), 2) for y, g in s.groupby("year")}))
     json.dump(dict(updated=datetime.now().strftime("%d %b %Y %H:%M"), baseline_big_move=baseline,
                    split_date=str(mid.date()), market_data=bool(len(nret)), setups=out), open(f"{OUT_DIR}/compare.json", "w"), indent=1)
     keep = ["setup", "stock", "entry_date", "entry_price", "stoploss", "p_t2", "p_t3", "p_trail", "reason"]
-    recent = T.sort_values("entry_date").groupby("setup").tail(400)[keep]
+    recent = T[~T["setup"].str.startswith("base")].sort_values("entry_date").groupby("setup").tail(400)[keep]
     json.dump(recent.to_dict("records"), open(f"{OUT_DIR}/compare_trades.json", "w"))
     for r in out:
         print(f"{r['label'][:38]:38} {r['exit']:5} n={r['trades']:5} win={r['win_rate']:5}% avg={r['avg_profit']:6}% "
