@@ -17,6 +17,11 @@ SHEET_CSV = os.environ.get("SHEET_CSV_URL") or (
     "https://docs.google.com/spreadsheets/d/1hu1z9l4Ghj8Ji5U9xztZsX_HC3Py9eYElP5UErA-yOM/export?format=csv&gid=66309173")
 
 
+def note(msg, level="notice"):
+    """Prints a line that also shows up as a GitHub annotation (easy to read without opening logs)."""
+    print(f"::{level}::" + str(msg).replace("\n", " | ")[:900], flush=True)
+
+
 def stock_list():
     """Stock list comes from your Google Sheet (must stay shared as 'anyone with the link can view').
     Falls back to CSV files in ./universe/ , then to niftyindices.com."""
@@ -25,9 +30,9 @@ def stock_list():
         r = requests.get(SHEET_CSV, timeout=60)
         r.raise_for_status()
         frames.append(pd.read_csv(io.StringIO(r.text)))
-        print(f"Stock list read from Google Sheet: {len(frames[0])} rows")
+        note(f"Stock list read from Google Sheet: {len(frames[0])} rows")
     except Exception as ex:
-        print(f"Could not read Google Sheet ({ex}); trying universe/ folder")
+        note(f"Could not read Google Sheet ({ex}); trying universe/ folder", "warning")
         for f in glob.glob("universe/*.csv"):
             frames.append(pd.read_csv(f))
         if not frames:
@@ -55,6 +60,7 @@ def get_candles(api, token, start, end):
                 if r and r.get("status"):
                     rows += r.get("data") or []
                     break
+                if attempt == 4: note(f"Candle request failed for token {token}: {str(r)[:200]}", "warning")
                 time.sleep(2 * (attempt + 1))          # probably "too many requests" - wait and retry
             except Exception:
                 time.sleep(2 * (attempt + 1))
@@ -72,13 +78,13 @@ def main():
     login = api.generateSession(cid, pin, pyotp.TOTP(totp).now())
     if not login or not login.get("status"):
         sys.exit(f"Angel One login failed: {login.get('message') if login else 'no reply'}")
-    print("Angel One login OK")
+    note("Angel One login OK")
 
     master = requests.get(SCRIP_URL, timeout=120).json()
     tokens = {m["name"]: m["token"] for m in master
               if m.get("exch_seg") == "NSE" and str(m.get("symbol", "")).endswith("-EQ")}
     syms = stock_list()
-    print(f"{len(syms)} stocks in list, {sum(s in tokens for s in syms)} found at Angel One")
+    note(f"{len(syms)} stocks in list, {sum(s in tokens for s in syms)} found at Angel One")
 
     os.makedirs(OUT, exist_ok=True)
     end = datetime.now()
@@ -98,10 +104,19 @@ def main():
         done += 1
         if i % 25 == 0:
             print(f"{i}/{len(syms)} done")
-    print(f"Saved {done} stocks, skipped {skipped}")
+    note(f"Saved {done} stocks, skipped {skipped}")
     if done < 50:
         sys.exit("Too few stocks downloaded - something is wrong.")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit as e:
+        if e.code not in (0, None):
+            note(e.code, "error")
+        raise
+    except Exception as e:
+        import traceback
+        note(f"{type(e).__name__}: {e} | " + traceback.format_exc()[-600:], "error")
+        raise
