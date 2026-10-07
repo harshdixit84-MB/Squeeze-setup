@@ -1,6 +1,10 @@
 smartapi-python
+websocket-client
+pycryptodome
 pyotp
 pandas
 numpy
 requests
 logzero
+six
+python-dateutil
