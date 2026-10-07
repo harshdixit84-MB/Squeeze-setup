@@ -3,8 +3,7 @@ Needs 4 GitHub secrets: ANGEL_API_KEY, ANGEL_CLIENT_ID, ANGEL_PIN, ANGEL_TOTP_SE
 Stock list: put CSV files (with a 'Symbol' column) in ./universe/ ; if none, it tries niftyindices.com."""
 import glob, io, os, sys, time
 from datetime import datetime, timedelta
-import pandas as pd, pyotp, requests
-from SmartApi import SmartConnect
+import pandas as pd, requests
 
 YEARS_BACK = 7.2              # 6 years + extra history so indicators are ready
 OUT = "data"
@@ -70,6 +69,11 @@ def get_candles(api, token, start, end):
 
 
 def main():
+    try:
+        import pyotp
+        from SmartApi import SmartConnect
+    except Exception as e:
+        sys.exit(f"Could not load Angel One library: {type(e).__name__}: {e}")
     key, cid, pin, totp = (os.environ.get(k) for k in
                            ("ANGEL_API_KEY", "ANGEL_CLIENT_ID", "ANGEL_PIN", "ANGEL_TOTP_SECRET"))
     if not all([key, cid, pin, totp]):
