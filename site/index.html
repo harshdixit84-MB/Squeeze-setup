@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quiet-then-Blast Backtest</title>
+<style>
+:root{color-scheme:light dark;--b:#8884;font-family:system-ui,sans-serif}
+body{max-width:1100px;margin:0 auto;padding:16px}
+h2{margin:28px 0 6px}p.n{margin:0 0 8px;opacity:.75}
+.w{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border:1px solid var(--b);padding:6px 8px;text-align:left;vertical-align:top}
+th{position:sticky;top:0;background:Canvas}.g{color:#16a34a;font-weight:600}.r{color:#dc2626;font-weight:600}
+input,select{padding:6px;margin:0 6px 8px 0}
+</style></head><body>
+<h1>Quiet-then-Blast Backtest</h1>
+<p id="meta" class="n">Loading...</p>
+<p class="n"><b>The idea:</b> when a stock goes very quiet (small daily range, calm price swings), a bigger move often follows. We wait for the stock to <b>close outside</b> the quiet day's range with high volume, then buy (up) or sell (down), with a stoploss and a target.</p>
+<h2>1. How many times did the setup appear?</h2><div class="w"><table id="t1"></table></div>
+<h2>2. Did a big move really follow?</h2><p class="n" id="n2"></p><div class="w"><table id="t2"></table></div>
+<h2>3. Results if you had traded it</h2><p class="n">Win rate = trades that made money. Profit figures are % per trade after costs.</p><div class="w"><table id="t3"></table></div>
+<h2>4. Stock-wise</h2><div class="w" style="max-height:360px;overflow:auto"><table id="t4"></table></div>
+<h2>5. Every trade, with the reason</h2>
+<select id="f"><option value="">Buy and Sell</option><option>buy</option><option>sell</option></select><input id="q" placeholder="Search stock name">
+<div class="w" style="max-height:520px;overflow:auto"><table id="t5"></table></div>
+<script>
+const $=i=>document.getElementById(i),J=u=>fetch(u).then(r=>r.json());
+const cl=v=>v>0?'g':v<0?'r':'';
+function tbl(id,cols,rows){$(id).innerHTML='<tr>'+cols.map(c=>`<th>${c[0]}</th>`).join('')+'</tr>'+rows.map(r=>'<tr>'+cols.map(c=>{const v=c[1](r);return`<td class="${c[2]?c[2](r):''}">${v??'-'}</td>`}).join('')+'</tr>').join('')}
+Promise.all([J('data/summary.json'),J('data/trades.json'),J('data/stocks.json')]).then(([s,t,st])=>{
+$('meta').textContent=`${s.stocks_tested} mid/small-cap stocks, price Rs 50-500, last ${s.years} years. Setup appeared ${s.times_appeared} times; ${s.trades_taken} turned into trades. Updated ${s.updated}.`;
+tbl('t1',[['Year',r=>r.year],['Times it appeared',r=>r.count]],s.by_year);
+const b=s.big_move;$('n2').textContent=`Share of cases where the stock moved ${b.move}% or more within ${b.days} trading days. If "after the setup" is not clearly higher than "normal days", the setup adds nothing.`;
+tbl('t2',[['',r=>r[0]],['Went up',r=>r[1].up+'%'],['Went down',r=>r[1].down+'%'],['Either way',r=>r[1].either+'%']],[['After the setup',b.after_setup],['Normal days',b.normal_days]]);
+tbl('t3',[['Direction',r=>r.direction],['Which trades',r=>r.filter],['Target',r=>r.target],['Trades',r=>r.trades],['Win rate',r=>r.win_rate+'%'],['Avg profit per trade',r=>r.avg_profit+'%',r=>cl(r.avg_profit)],['Avg on winners',r=>r.avg_win+'%'],['Avg on losers',r=>r.avg_loss+'%'],['Avg days held',r=>r.avg_days],['Verdict',r=>r.verdict]],s.results);
+tbl('t4',[['Stock',r=>r.stock],['Times it appeared',r=>r.times_appeared],['Trades',r=>r.trades],['Win rate',r=>r.win_rate==null?null:r.win_rate+'%'],['Avg profit per trade',r=>r.avg_profit==null?null:r.avg_profit+'%',r=>cl(r.avg_profit)]],st);
+const draw=()=>{const f=$('f').value,q=$('q').value.toUpperCase();
+tbl('t5',[['Stock',r=>r.stock],['Buy/Sell',r=>r.direction],['Entry date',r=>r.entry_date],['Entry price',r=>r.entry_price],['Stoploss',r=>r.stoploss],['Target',r=>r.target_2x],['Result (2x target)',r=>r.pct_2+'% - '+r.how_2,r=>cl(r.pct_2)],['Why this trade',r=>r.reason]],t.filter(r=>(!f||r.direction==f)&&r.stock.toUpperCase().includes(q)).slice(-1500).reverse())};
+$('f').onchange=$('q').oninput=draw;draw()}).catch(e=>$('meta').textContent='No results yet. Run the GitHub workflow first. ('+e+')');
+</script></body></html>
