@@ -146,6 +146,8 @@ def main():
     S, T, B, notes, n_stocks = [], [], [], [], 0
     for f in sorted(glob.glob(f"{DATA_DIR}/*.csv")):
         sym = os.path.basename(f)[:-4]
+        if sym.startswith("_"):
+            continue
         df = load(f)
         if len(df) < 300: continue
         a, b, c = run_symbol(sym, fix_splits(df, sym, notes), cutoff)

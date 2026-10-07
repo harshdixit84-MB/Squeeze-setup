@@ -13,6 +13,9 @@ input,select{padding:6px;margin:0 6px 8px 0}
 <h1>Quiet-then-Blast Backtest</h1>
 <p id="meta" class="n">Loading...</p>
 <p class="n"><b>The idea:</b> when a stock goes very quiet (small daily range, calm price swings), a bigger move often follows. We wait for the stock to <b>close outside</b> the quiet day's range with high volume, then buy (up) or sell (down), with a stoploss and a target.</p>
+<h2>Setup comparison</h2><p class="n">Five buy-only setups, same stocks, same costs, same stoploss rule. Each is tested on the first 3 years and the last 3 years separately: trust a setup only if it makes money in both.</p>
+<div class="w"><table id="c1"></table></div><p class="n" id="cd"></p>
+<select id="cs"></select><div class="w" style="max-height:420px;overflow:auto"><table id="c2"></table></div>
 <h2>1. How many times did the setup appear?</h2><div class="w"><table id="t1"></table></div>
 <h2>2. Did a big move really follow?</h2><p class="n" id="n2"></p><div class="w"><table id="t2"></table></div>
 <h2>3. Results if you had traded it</h2><p class="n">Win rate = trades that made money. Profit figures are % per trade after costs.</p><div class="w"><table id="t3"></table></div>
@@ -34,4 +37,11 @@ tbl('t4',[['Stock',r=>r.stock],['Times it appeared',r=>r.times_appeared],['Trade
 const draw=()=>{const f=$('f').value,q=$('q').value.toUpperCase();
 tbl('t5',[['Stock',r=>r.stock],['Buy/Sell',r=>r.direction],['Entry date',r=>r.entry_date],['Entry price',r=>r.entry_price],['Stoploss',r=>r.stoploss],['Target',r=>r.target_2x],['Result (2x target)',r=>r.pct_2+'% - '+r.how_2,r=>cl(r.pct_2)],['Why this trade',r=>r.reason]],t.filter(r=>(!f||r.direction==f)&&r.stock.toUpperCase().includes(q)).slice(-1500).reverse())};
 $('f').onchange=$('q').oninput=draw;draw()}).catch(e=>$('meta').textContent='No results yet. Run the GitHub workflow first. ('+e+')');
+Promise.all([J('data/compare.json'),J('data/compare_trades.json')]).then(([c,ct])=>{
+tbl('c1',[['Setup',r=>r.label],['How we exit',r=>r.exit_label],['Trades',r=>r.trades],['Win rate',r=>r.win_rate+'%'],['Avg profit per trade',r=>r.avg_profit+'%',r=>cl(r.avg_profit)],['First 3 years',r=>r.first_profit+'% ('+r.first_trades+' trades)',r=>cl(r.first_profit)],['Last 3 years',r=>r.last_profit+'% ('+r.last_trades+' trades)',r=>cl(r.last_profit)],['Rose 10%+ in 10 days',r=>r.big_move+'% (normal days: '+c.baseline_big_move+'%)'],['Verdict',r=>r.verdict]],c.setups);
+const u=[...new Map(c.setups.map(r=>[r.setup,r])).values()];
+$('cd').innerHTML=u.map(r=>'<b>'+r.label+':</b> '+r.desc).join('<br>');
+$('cs').innerHTML=u.map(r=>`<option value="${r.setup}">${r.label}</option>`).join('');
+const dr=()=>tbl('c2',[['Stock',r=>r.stock],['Entry date',r=>r.entry_date],['Entry price',r=>r.entry_price],['Stoploss',r=>r.stoploss],['Result (2x target)',r=>r.p_t2+'%',r=>cl(r.p_t2)],['Result (trailing)',r=>r.p_trail+'%',r=>cl(r.p_trail)],['Why this trade',r=>r.reason]],ct.filter(r=>r.setup==$('cs').value).reverse());
+$('cs').onchange=dr;dr()}).catch(()=>{});
 </script></body></html>

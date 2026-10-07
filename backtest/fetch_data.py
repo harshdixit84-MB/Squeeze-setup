@@ -1,29 +1,39 @@
-"""Downloads about 7 years of daily prices for midcap + smallcap NSE stocks from Angel One into ./data/
+"""Downloads daily prices for midcap + smallcap NSE stocks (and Nifty 50) from Angel One into ./data/
+Incremental: if a stock file already exists (restored from the GitHub cache), only the missing recent days are fetched.
 Needs 4 GitHub secrets: ANGEL_API_KEY, ANGEL_CLIENT_ID, ANGEL_PIN, ANGEL_TOTP_SECRET.
-Stock list: put CSV files (with a 'Symbol' column) in ./universe/ ; if none, it tries niftyindices.com."""
-import glob, io, os, sys, time
+Stock list: your Google Sheet (see SHEET_CSV), else ./universe/*.csv, else niftyindices.com."""
+import glob, io, os, sys, threading, time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 import pandas as pd, requests
 
 YEARS_BACK = 7.2              # 6 years + extra history so indicators are ready
 OUT = "data"
+WORKERS = 3
 SCRIP_URL = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json"
 INDEX_URLS = ["https://niftyindices.com/IndexConstituent/ind_niftymidcap150list.csv",
               "https://niftyindices.com/IndexConstituent/ind_niftysmallcap250list.csv"]
-
-
 SHEET_CSV = os.environ.get("SHEET_CSV_URL") or (
     "https://docs.google.com/spreadsheets/d/1hu1z9l4Ghj8Ji5U9xztZsX_HC3Py9eYElP5UErA-yOM/export?format=csv&gid=66309173")
+COLS = ["date", "open", "high", "low", "close", "volume"]
+_lock, _last, _count = threading.Lock(), [0.0], [0]
 
 
 def note(msg, level="notice"):
-    """Prints a line that also shows up as a GitHub annotation (easy to read without opening logs)."""
+    """Prints a line that also shows up as a GitHub annotation."""
     print(f"::{level}::" + str(msg).replace("\n", " | ")[:900], flush=True)
 
 
+def pace():
+    """Keeps all threads together under ~3 requests per second (Angel's limit)."""
+    with _lock:
+        wait = _last[0] + 0.35 - time.time()
+        if wait > 0:
+            time.sleep(wait)
+        _last[0] = time.time()
+
+
 def stock_list():
-    """Stock list comes from your Google Sheet (must stay shared as 'anyone with the link can view').
-    Falls back to CSV files in ./universe/ , then to niftyindices.com."""
     frames = []
     try:
         r = requests.get(SHEET_CSV, timeout=60)
@@ -42,7 +52,7 @@ def stock_list():
     syms = set()
     for df in frames:
         if "Series" in df.columns:
-            df = df[df["Series"].astype(str).str.strip() == "EQ"]     # drops REITs etc.
+            df = df[df["Series"].astype(str).str.strip() == "EQ"]
         syms |= set(df["Symbol"].dropna().astype(str).str.strip())
     return sorted(syms)
 
@@ -50,22 +60,41 @@ def stock_list():
 def get_candles(api, token, start, end):
     rows, s = [], start
     while s < end:
-        e = min(s + timedelta(days=1700), end)      # Angel allows ~2000 days per request
+        e = min(s + timedelta(days=1700), end)
         for attempt in range(5):
             try:
+                pace()
                 r = api.getCandleData({"exchange": "NSE", "symboltoken": token, "interval": "ONE_DAY",
                                        "fromdate": s.strftime("%Y-%m-%d 09:15"),
                                        "todate": e.strftime("%Y-%m-%d 15:30")})
                 if r and r.get("status"):
                     rows += r.get("data") or []
                     break
-                if attempt == 4: note(f"Candle request failed for token {token}: {str(r)[:200]}", "warning")
-                time.sleep(2 * (attempt + 1))          # probably "too many requests" - wait and retry
+                if attempt == 4:
+                    note(f"Candle request failed for token {token}: {str(r)[:200]}", "warning")
+                time.sleep(2 * (attempt + 1))
             except Exception:
                 time.sleep(2 * (attempt + 1))
-        time.sleep(0.4)
         s = e + timedelta(days=1)
     return rows
+
+
+def fetch_one(api, name, token, start_all, end):
+    path = f"{OUT}/{name.replace('&', '_')}.csv"
+    old, start = None, start_all
+    if os.path.exists(path):
+        old = pd.read_csv(path, parse_dates=["date"])
+        if len(old):
+            start = max(start_all, old["date"].max().to_pydatetime() - timedelta(days=7))
+    rows = get_candles(api, token, start, end)
+    new = pd.DataFrame(rows, columns=COLS)
+    new["date"] = pd.to_datetime(new["date"]).dt.tz_localize(None).dt.normalize()
+    df = pd.concat([old, new]) if old is not None else new
+    df = df.drop_duplicates("date", keep="last").sort_values("date")
+    if len(df) < 300:
+        return False
+    df.to_csv(path, index=False)
+    return True
 
 
 def main():
@@ -87,28 +116,37 @@ def main():
     master = requests.get(SCRIP_URL, timeout=120).json()
     tokens = {m["name"]: m["token"] for m in master
               if m.get("exch_seg") == "NSE" and str(m.get("symbol", "")).endswith("-EQ")}
+    nifty = next((m["token"] for m in master if m.get("exch_seg") == "NSE" and m.get("symbol") == "Nifty 50"), "99926000")
     syms = stock_list()
     note(f"{len(syms)} stocks in list, {sum(s in tokens for s in syms)} found at Angel One")
 
     os.makedirs(OUT, exist_ok=True)
     end = datetime.now()
     start = end - timedelta(days=int(365 * YEARS_BACK))
-    done = skipped = 0
-    for i, s in enumerate(syms, 1):
+    try:
+        fetch_one(api, "_NIFTY50", nifty, start, end)
+        note("Nifty 50 index data saved")
+    except Exception as e:
+        note(f"Could not get Nifty 50 data: {e}", "warning")
+
+    def work(s):
         if s not in tokens:
-            skipped += 1
-            continue
-        rows = get_candles(api, tokens[s], start, end)
-        if len(rows) < 300:
-            skipped += 1
-            continue
-        df = pd.DataFrame(rows, columns=["date", "open", "high", "low", "close", "volume"])
-        df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None).dt.normalize()
-        df.drop_duplicates("date").sort_values("date").to_csv(f"{OUT}/{s.replace('&', '_')}.csv", index=False)
-        done += 1
-        if i % 25 == 0:
-            print(f"{i}/{len(syms)} done")
-    note(f"Saved {done} stocks, skipped {skipped}")
+            return False
+        try:
+            ok = fetch_one(api, s, tokens[s], start, end)
+        except Exception as e:
+            note(f"{s}: {type(e).__name__}: {e}", "warning")
+            ok = False
+        with _lock:
+            _count[0] += 1
+            if _count[0] % 25 == 0:
+                print(f"{_count[0]}/{len(syms)} done", flush=True)
+        return ok
+
+    with ThreadPoolExecutor(WORKERS) as ex:
+        results = list(ex.map(work, syms))
+    done = sum(results)
+    note(f"Saved {done} stocks, skipped {len(syms) - done}")
     if done < 50:
         sys.exit("Too few stocks downloaded - something is wrong.")
 

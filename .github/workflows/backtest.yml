@@ -6,13 +6,19 @@ permissions:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
+      - name: Restore saved prices (saves download time)
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: prices-v1-${{ github.run_id }}
+          restore-keys: prices-v1-
       - name: Download NSE share prices from Angel One
         env:
           ANGEL_API_KEY: ${{ secrets.ANGEL_API_KEY }}
@@ -20,12 +26,21 @@ jobs:
           ANGEL_PIN: ${{ secrets.ANGEL_PIN }}
           ANGEL_TOTP_SECRET: ${{ secrets.ANGEL_TOTP_SECRET }}
         run: python backtest/fetch_data.py
-      - name: Run the backtest
+      - name: Save prices for next time
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: prices-v1-${{ github.run_id }}
+      - name: Test setup 1 - quiet day then breakout
         run: python backtest/run_backtest.py
+      - name: Compare 5 other setups
+        run: python backtest/compare_setups.py
       - name: Save results into the repo
         run: |
           git config user.name "backtest-bot"
           git config user.email "backtest-bot@users.noreply.github.com"
           git add site/data
           git commit -m "Update backtest results" || echo "Nothing new to save"
+          git pull --rebase origin main
           git push
