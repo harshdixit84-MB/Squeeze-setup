@@ -13,17 +13,33 @@ INDEX_URLS = ["https://niftyindices.com/IndexConstituent/ind_niftymidcap150list.
               "https://niftyindices.com/IndexConstituent/ind_niftysmallcap250list.csv"]
 
 
+SHEET_CSV = os.environ.get("SHEET_CSV_URL") or (
+    "https://docs.google.com/spreadsheets/d/1hu1z9l4Ghj8Ji5U9xztZsX_HC3Py9eYElP5UErA-yOM/export?format=csv&gid=66309173")
+
+
 def stock_list():
-    files = glob.glob("universe/*.csv")
-    texts = [open(f, encoding="utf-8").read() for f in files]
-    if not texts:
-        for u in INDEX_URLS:
-            r = requests.get(u, headers={"User-Agent": "Mozilla/5.0"}, timeout=60)
-            r.raise_for_status()
-            texts.append(r.text)
+    """Stock list comes from your Google Sheet (must stay shared as 'anyone with the link can view').
+    Falls back to CSV files in ./universe/ , then to niftyindices.com."""
+    frames = []
+    try:
+        r = requests.get(SHEET_CSV, timeout=60)
+        r.raise_for_status()
+        frames.append(pd.read_csv(io.StringIO(r.text)))
+        print(f"Stock list read from Google Sheet: {len(frames[0])} rows")
+    except Exception as ex:
+        print(f"Could not read Google Sheet ({ex}); trying universe/ folder")
+        for f in glob.glob("universe/*.csv"):
+            frames.append(pd.read_csv(f))
+        if not frames:
+            for u in INDEX_URLS:
+                r = requests.get(u, headers={"User-Agent": "Mozilla/5.0"}, timeout=60)
+                r.raise_for_status()
+                frames.append(pd.read_csv(io.StringIO(r.text)))
     syms = set()
-    for t in texts:
-        syms |= set(pd.read_csv(io.StringIO(t))["Symbol"].dropna().astype(str).str.strip())
+    for df in frames:
+        if "Series" in df.columns:
+            df = df[df["Series"].astype(str).str.strip() == "EQ"]     # drops REITs etc.
+        syms |= set(df["Symbol"].dropna().astype(str).str.strip())
     return sorted(syms)
 
 
