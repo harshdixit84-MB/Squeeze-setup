@@ -1,0 +1,150 @@
+{
+ "updated": "07 Oct 2026 11:31",
+ "stocks_tested": 371,
+ "years": 6,
+ "times_appeared": 4048,
+ "trades_taken": 2899,
+ "by_year": [
+  {
+   "year": 2020,
+   "count": 262
+  },
+  {
+   "year": 2021,
+   "count": 702
+  },
+  {
+   "year": 2022,
+   "count": 782
+  },
+  {
+   "year": 2023,
+   "count": 723
+  },
+  {
+   "year": 2024,
+   "count": 442
+  },
+  {
+   "year": 2025,
+   "count": 733
+  },
+  {
+   "year": 2026,
+   "count": 404
+  }
+ ],
+ "big_move": {
+  "after_setup": {
+   "up": 24.1,
+   "down": 11.3,
+   "either": 34.7
+  },
+  "normal_days": {
+   "up": 26.2,
+   "down": 15.1,
+   "either": 40.5
+  },
+  "days": 10,
+  "move": 10
+ },
+ "results": [
+  {
+   "direction": "Buy (price went up)",
+   "filter": "All trades",
+   "target": "Profit 2x the amount risked",
+   "trades": 1854,
+   "win_rate": 37.4,
+   "avg_profit": 0.09,
+   "avg_win": 6.88,
+   "avg_loss": -3.96,
+   "avg_days": 4.8,
+   "verdict": "Barely profitable"
+  },
+  {
+   "direction": "Buy (price went up)",
+   "filter": "All trades",
+   "target": "Profit 3x the amount risked",
+   "trades": 1854,
+   "win_rate": 31.9,
+   "avg_profit": 0.17,
+   "avg_win": 8.86,
+   "avg_loss": -3.91,
+   "avg_days": 5.9,
+   "verdict": "Barely profitable"
+  },
+  {
+   "direction": "Buy (price went up)",
+   "filter": "Only when stock was already moving that way (50-day trend)",
+   "target": "Profit 2x the amount risked",
+   "trades": 1427,
+   "win_rate": 35.7,
+   "avg_profit": -0.05,
+   "avg_win": 7.19,
+   "avg_loss": -4.08,
+   "avg_days": 4.8,
+   "verdict": "Does not work"
+  },
+  {
+   "direction": "Buy (price went up)",
+   "filter": "Only when stock was already moving that way (50-day trend)",
+   "target": "Profit 3x the amount risked",
+   "trades": 1427,
+   "win_rate": 31.1,
+   "avg_profit": 0.05,
+   "avg_win": 9.09,
+   "avg_loss": -4.03,
+   "avg_days": 6.0,
+   "verdict": "Barely profitable"
+  },
+  {
+   "direction": "Sell (price went down)",
+   "filter": "All trades",
+   "target": "Profit 2x the amount risked",
+   "trades": 1045,
+   "win_rate": 36.5,
+   "avg_profit": -0.25,
+   "avg_win": 5.21,
+   "avg_loss": -3.39,
+   "avg_days": 4.6,
+   "verdict": "Does not work"
+  },
+  {
+   "direction": "Sell (price went down)",
+   "filter": "All trades",
+   "target": "Profit 3x the amount risked",
+   "trades": 1045,
+   "win_rate": 32.1,
+   "avg_profit": -0.26,
+   "avg_win": 6.31,
+   "avg_loss": -3.35,
+   "avg_days": 5.8,
+   "verdict": "Does not work"
+  },
+  {
+   "direction": "Sell (price went down)",
+   "filter": "Only when stock was already moving that way (50-day trend)",
+   "target": "Profit 2x the amount risked",
+   "trades": 794,
+   "win_rate": 36.4,
+   "avg_profit": -0.3,
+   "avg_win": 5.34,
+   "avg_loss": -3.52,
+   "avg_days": 4.9,
+   "verdict": "Does not work"
+  },
+  {
+   "direction": "Sell (price went down)",
+   "filter": "Only when stock was already moving that way (50-day trend)",
+   "target": "Profit 3x the amount risked",
+   "trades": 794,
+   "win_rate": 32.0,
+   "avg_profit": -0.31,
+   "avg_win": 6.42,
+   "avg_loss": -3.47,
+   "avg_days": 6.0,
+   "verdict": "Does not work"
+  }
+ ],
+ "split_fixes": 2
+}
