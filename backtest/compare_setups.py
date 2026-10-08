@@ -43,6 +43,7 @@ def indic(d, nret20):
     d["nret20"] = nret20.reindex(d.index).ffill()
     d["rng10p"] = ((h.rolling(10).max() - l.rolling(10).min()) / c).shift(1)
     d["pull"] = d["hi10p"] / pc - 1
+    d["fwd_c10"] = c.shift(-10) / c - 1
     d["fwd_hi"] = h[::-1].rolling(10, min_periods=10).max()[::-1].shift(-1) / c - 1
     d["eligible"] = c.between(PRICE_MIN, PRICE_MAX) & (d["vol20"] * c >= MIN_TURNOVER)
     return d
@@ -122,7 +123,7 @@ def main():
                 if risk / o[e] > 0.12 or not (PRICE_MIN <= o[e] <= PRICE_MAX * 1.1): continue
                 r = d.iloc[i]
                 row = dict(setup=key, stock=sym, signal_date=str(d.index[i].date()), entry_date=str(d.index[e].date()),
-                           entry_price=round(o[e], 2), stoploss=round(o[e] - risk, 2), fwd_hi=r["fwd_hi"],
+                           entry_price=round(o[e], 2), stoploss=round(o[e] - risk, 2), fwd_hi=r["fwd_hi"], fwd_c10=r["fwd_c10"],
                            reason="" if key.startswith("base") else (f"{SETUPS[key][1]} On {d.index[i].date()} it closed at {c[i]:.1f}, {100 * (1 - r['near']):.1f}% below its "
                                    f"1-year high, on {r['volx']:.1f}x normal volume. 20-day change: stock {r['ret20']:+.0%}, market {r['nret20']:+.0%}."))
                 for kind in EXITS:
@@ -138,12 +139,17 @@ def main():
     ref = {k: T[T["setup"] == "base_any"][f"p_{k}"].mean() for k in EXITS}
     for key, (label, desc) in SETUPS.items():
         s = T[T["setup"] == key]
-        bm = round((s["fwd_hi"].dropna() >= 0.10).mean() * 100, 1) if len(s) else 0
+        fh, fc = s["fwd_hi"].dropna(), s["fwd_c10"].dropna()
+        bm = round((fh >= 0.10).mean() * 100, 1) if len(fh) else 0
+        p8 = round((fh >= 0.08).mean() * 100, 1) if len(fh) else 0
+        best_avg = round(fh.mean() * 100, 1) if len(fh) else 0
+        best_med = round(fh.median() * 100, 1) if len(fh) else 0
+        day10 = round(fc.mean() * 100, 1) if len(fc) else 0
         for kind, (xl, _) in EXITS.items():
             a, f, l = stats(s, kind), stats(s[s["first"]], kind), stats(s[~s["first"]], kind)
             out.append(dict(setup=key, label=label, desc=desc, exit=kind, exit_label=xl, **a,
                             first_profit=f["avg_profit"], first_trades=f["trades"], last_profit=l["avg_profit"],
-                            last_trades=l["trades"], big_move=bm, verdict=verdict(f, l),
+                            last_trades=l["trades"], big_move=bm, reach8=p8, best_avg=best_avg, best_med=best_med, day10=day10, verdict=verdict(f, l),
                             edge=round(a["avg_profit"] - ref[kind], 2),
                             by_year={int(y): round(g[f"p_{kind}"].mean(), 2) for y, g in s.groupby("year")}))
     json.dump(dict(updated=datetime.now().strftime("%d %b %Y %H:%M"), baseline_big_move=baseline,
