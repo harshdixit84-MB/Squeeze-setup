@@ -4,7 +4,7 @@ Needs 4 GitHub secrets: ANGEL_API_KEY, ANGEL_CLIENT_ID, ANGEL_PIN, ANGEL_TOTP_SE
 Stock list: your Google Sheet (see SHEET_CSV), else ./universe/*.csv, else niftyindices.com."""
 import glob, io, os, sys, threading, time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pandas as pd, requests
 
 YEARS_BACK = 7.2              # 6 years + extra history so indicators are ready
@@ -91,6 +91,9 @@ def fetch_one(api, name, token, start_all, end):
     new["date"] = pd.to_datetime(new["date"]).dt.tz_localize(None).dt.normalize()
     df = pd.concat([old, new]) if old is not None else new
     df = df.drop_duplicates("date", keep="last").sort_values("date")
+    ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+    if ist.hour * 60 + ist.minute < 16 * 60:          # market still open / not yet settled: today's candle is incomplete
+        df = df[df["date"].dt.date < ist.date()]
     if len(df) < 300:
         return False
     df.to_csv(path, index=False)
