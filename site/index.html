@@ -8,11 +8,13 @@ h2{margin:28px 0 6px}p.n{margin:0 0 8px;opacity:.75}
 .w{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
 th,td{border:1px solid var(--b);padding:6px 8px;text-align:left;vertical-align:top}
 th{position:sticky;top:0;background:Canvas}.g{color:#16a34a;font-weight:600}.r{color:#dc2626;font-weight:600}
+.k{border:1px solid var(--b);border-radius:8px;padding:10px;margin:0 0 12px;display:grid;grid-template-columns:1fr 340px;gap:12px}@media(max-width:760px){.k{grid-template-columns:1fr}}
 input,select{padding:6px;margin:0 6px 8px 0}
 </style></head><body>
 <h1>Quiet-then-Blast Backtest</h1>
 <p id="meta" class="n">Loading...</p>
 <p class="n"><b>The idea:</b> when a stock goes very quiet (small daily range, calm price swings), a bigger move often follows. We wait for the stock to <b>close outside</b> the quiet day's range with high volume, then buy (up) or sell (down), with a stoploss and a target.</p>
+<h2>Today's stocks matching the two chosen setups</h2><p class="n" id="cm"></p><div id="cc"></div>
 <h2>Setup comparison</h2><p class="n">Five buy-only setups, same stocks, same costs, same stoploss rule. Each is tested on the first 3 years and the last 3 years separately: trust a setup only if it makes money in both.</p>
 <div class="w"><table id="c1"></table></div><p class="n" id="cd"></p>
 <select id="cs"></select><div class="w" style="max-height:420px;overflow:auto"><table id="c2"></table></div>
@@ -37,6 +39,12 @@ tbl('t4',[['Stock',r=>r.stock],['Times it appeared',r=>r.times_appeared],['Trade
 const draw=()=>{const f=$('f').value,q=$('q').value.toUpperCase();
 tbl('t5',[['Stock',r=>r.stock],['Buy/Sell',r=>r.direction],['Entry date',r=>r.entry_date],['Entry price',r=>r.entry_price],['Stoploss',r=>r.stoploss],['Target',r=>r.target_2x],['Result (2x target)',r=>r.pct_2+'% - '+r.how_2,r=>cl(r.pct_2)],['Why this trade',r=>r.reason]],t.filter(r=>(!f||r.direction==f)&&r.stock.toUpperCase().includes(q)).slice(-1500).reverse())};
 $('f').onchange=$('q').oninput=draw;draw()}).catch(e=>$('meta').textContent='No results yet. Run the GitHub workflow first. ('+e+')');
+function chart(c){const x=c.chart,W=340,H=170,P=34,lv=[c.stoploss,c.close,c.target1,c.target2],v=x.c.concat(lv),lo=Math.min(...v),hi=Math.max(...v),y=a=>H-12-(a-lo)/(hi-lo)*(H-24),X=i=>6+i*(W-P-12)/(x.c.length-1);
+const pl=a=>a.map((v,i)=>v==null?'':X(i)+','+y(v)).filter(Boolean).join(' ');
+const L=(a,col,t)=>`<line x1="0" x2="${W-P}" y1="${y(a)}" y2="${y(a)}" stroke="${col}" stroke-dasharray="4 3"/><text x="${W-P+2}" y="${y(a)+3}" font-size="9" fill="${col}">${t} ${a}</text>`;
+return`<svg viewBox="0 0 ${W} ${H}" width="100%"><polyline fill="none" stroke="#888" points="${pl(x.m)}"/><polyline fill="none" stroke="#2563eb" stroke-width="1.6" points="${pl(x.c)}"/>${L(c.stoploss,'#dc2626','Stop')}${L(c.close,'#888','Buy')}${L(c.target1,'#16a34a','T1')}${L(c.target2,'#15803d','T2')}</svg>`}
+J('data/candidates.json').then(k=>{$('cm').textContent=k.candidates.length?`Prices up to ${k.data_date}; ${k.stocks_scanned} stocks scanned; ${k.candidates.length} match. Blue line = price, grey = 50-day average. Buy near the next morning's price; the lines are estimates from the last close.`:`No stock matched on ${k.data_date} (${k.stocks_scanned} scanned). That is normal on many days.`;
+$('cc').innerHTML=k.candidates.map(c=>`<div class="k"><div><b>${c.stock}</b> - ${c.setups.join(' + ')}<br>Last close Rs ${c.close} (${c.signal_date}). <b>Stoploss Rs ${c.stoploss}</b> (-${c.risk_pct}%), <span class="g">Target 1 Rs ${c.target1}</span>, <span class="g">Target 2 Rs ${c.target2}</span>.<p class="n"><b>Why:</b> ${c.reason} Today: ${c.below_high}% below its 1-year high, ${c.volx}x normal volume, 20-day change ${c.ret20}% (market ${c.nret20}%).</p>${c.record.map(r=>`<p class="n"><b>Past record, ${r.setup}:</b> appeared ${r.times_6y} times in 6 years; ${r.win_rate}% of trades made money; average ${r.avg_profit}% per trade (first 3 years ${r.first}%, last 3 years ${r.last}%); held about ${r.avg_days} days.</p>`).join('')}</div><div>${chart(c)}</div></div>`).join('')}).catch(()=>$('cm').textContent='Candidates not ready yet - run the Daily scan workflow.');
 Promise.all([J('data/compare.json'),J('data/compare_trades.json')]).then(([c,ct])=>{
 tbl('c1',[['Setup',r=>r.label],['How we exit',r=>r.exit_label],['Trades',r=>r.trades],['Win rate',r=>r.win_rate+'%'],['Avg profit per trade',r=>r.avg_profit+'%',r=>cl(r.avg_profit)],['Better than random day by',r=>r.edge+'%',r=>cl(r.edge)],['First 3 years',r=>r.first_profit+'% ('+r.first_trades+' trades)',r=>cl(r.first_profit)],['Last 3 years',r=>r.last_profit+'% ('+r.last_trades+' trades)',r=>cl(r.last_profit)],['Reached +8% in 10 days',r=>r.reach8+'%'],['Reached +10% in 10 days',r=>r.big_move+'%'],['Typical best gain in 10 days',r=>r.best_avg+'% (middle case '+r.best_med+'%)'],['Change after exactly 10 days',r=>r.day10+'%',r=>cl(r.day10)],['Verdict',r=>r.verdict]],c.setups);
 const u=[...new Map(c.setups.map(r=>[r.setup,r])).values()];
