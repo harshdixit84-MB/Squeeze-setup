@@ -1,0 +1,56 @@
+name: Fund portfolios
+on:
+  schedule:
+    - cron: "30 4 * * *"          # every day 10:00 AM India time; commits only when a fund has a new month's portfolio
+  workflow_dispatch:
+    inputs:
+      fund_name:
+        description: "Fund to add (optional)"
+        required: false
+      fund_url:
+        description: "dezerv.in page link of that fund (optional)"
+        required: false
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: mf-portfolios
+  cancel-in-progress: false
+jobs:
+  fetch:
+    # issues only count when they come from the repo owner and start with "Add fund:"
+    if: github.event_name != 'issues' || (startsWith(github.event.issue.title, 'Add fund:') && github.event.issue.user.login == github.repository_owner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests pandas lxml beautifulsoup4
+      - name: Fetch latest fund portfolios
+        env:
+          ADD_FUND: ${{ github.event.inputs.fund_name }}
+          ADD_URL: ${{ github.event.inputs.fund_url }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: python mf/fetch_mf.py
+      - name: Save results into the repo
+        if: always()
+        run: |
+          git config user.name "backtest-bot"
+          git config user.email "backtest-bot@users.noreply.github.com"
+          git add mf site/data/mf_portfolios.json
+          git commit -m "Update fund portfolios" || echo "Nothing new to save"
+          git pull --rebase origin main
+          git push
+      - name: Reply on the issue
+        if: always() && github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo "Result:"; cat /tmp/mf_summary.md 2>/dev/null || echo "Something went wrong - see the workflow run."; echo; echo "The dashboard updates in about a minute."; } > /tmp/reply.md
+          gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body-file /tmp/reply.md
+          gh issue close ${{ github.event.issue.number }} --repo ${{ github.repository }}
