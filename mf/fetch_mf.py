@@ -42,30 +42,43 @@ def tokens(s):
     return {t for t in re.findall(r"[a-z0-9]+", s.lower().replace("&", " and ")) if t not in STOP}
 
 
-_sitemap = []
-def sitemap_urls():
-    if _sitemap:
-        return _sitemap
-    found = set()
-    for sm in SITEMAPS:
-        try:
-            txt = get(sm, tries=1)
-        except Exception as e:
-            say(f"sitemap {sm}: {e}")
-            continue
-        for u in re.findall(r"(?:https://www\.dezerv\.in)?/mutual-funds/([a-z0-9\-]+-inf[0-9a-z]{9})/?", txt):
-            found.add(f"{BASE}/mutual-funds/{u}/")
-        say(f"sitemap {sm}: {len(found)} fund pages so far")
-        if len(found) > 200:
-            break
-    _sitemap.extend(sorted(found))
-    return _sitemap
+_pool = {}
+FUND_LINK = re.compile(r"(?:https://www\.dezerv\.in)?/mutual-funds/([a-z0-9\-]+-inf[0-9a-z]{9})/?")
+
+
+def harvest(url, label):
+    """Collects every fund page link found on one dezerv.in page."""
+    try:
+        txt = get(url, tries=1)
+    except Exception as e:
+        say(f"[discover] {label}: {e}")
+        return 0
+    n0 = len(_pool)
+    for u in FUND_LINK.findall(txt):
+        _pool[u] = f"{BASE}/mutual-funds/{u}/"
+    say(f"[discover] {label}: {len(txt)} chars, {txt.count('/mutual-funds/')} links, {len(_pool) - n0} new fund pages")
+    return len(_pool) - n0
+
+
+def candidates(name):
+    if not _pool:
+        for sm in SITEMAPS:
+            harvest(sm, sm)
+    # the AMC's own listing page (e.g. /mutual-funds/amc/icici-prudential/) - try the first 1-3 words of the name
+    words = re.findall(r"[a-z0-9]+", name.lower())
+    for k in (1, 2, 3):
+        if len(words) >= k:
+            harvest(f"{BASE}/mutual-funds/amc/{'-'.join(words[:k])}/", f"amc {'-'.join(words[:k])}")
+    if len(_pool) < 30:
+        for u in list(_pool.values())[:3]:
+            harvest(u, u)
+    return sorted(_pool.values())
 
 
 def resolve_url(name):
     want = tokens(name)
     best = None
-    for u in sitemap_urls():
+    for u in candidates(name):
         slug = u.rstrip("/").rsplit("/", 1)[-1]
         slug = re.sub(r"-inf[0-9a-z]{9}$", "", slug)
         have = tokens(slug.replace("-", " "))
@@ -162,6 +175,7 @@ def main():
             else:
                 data["funds"][name] = dict(name=name, matched=name, holdings=[], error=str(ex)[:200])
     data["funds"] = {k: v for k, v in data["funds"].items() if k in {f["name"] for f in funds}}
+    data["log"] = LOG[-40:]
     data["updated"] = datetime.now().strftime("%d %b %Y %H:%M")
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     json.dump(data, open(OUT, "w"), separators=(",", ":"))
