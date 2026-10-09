@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 FUNDS_FILE, OUT = "mf/funds.json", "site/data/mf_portfolios.json"
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/124.0"}
 BASE = "https://www.dezerv.in"
-SITEMAPS = [BASE + "/mutual-funds/sitemap/", BASE + "/sitemap.xml", BASE + "/mutual-funds/sitemap.xml"]
+SITEMAPS = [BASE + "/mutual-funds/sitemap-0.xml"]
 STOP = {"fund", "plan", "growth", "regular", "direct", "option", "scheme", "the", "of", "and", "mutual"}
 MONTHS = {m: i for i, m in enumerate(["january", "february", "march", "april", "may", "june", "july", "august",
                                      "september", "october", "november", "december"], 1)}
@@ -66,7 +66,9 @@ def candidates(name):
     if not _pool:
         for sm in SITEMAPS:
             harvest(sm, sm)
-    # the AMC's own listing page (e.g. /mutual-funds/amc/icici-prudential/) - try the first 1-3 words of the name
+    if len(_pool) >= 200:                      # the sitemap lists every fund, nothing more to look for
+        return sorted(_pool.values())
+    # fallback - the AMC's own listing page (e.g. /mutual-funds/amc/icici-prudential/) - try the first 1-3 words of the name
     words = re.findall(r"[a-z0-9]+", name.lower())
     for k in (1, 2, 3):
         if len(words) >= k:
