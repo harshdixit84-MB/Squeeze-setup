@@ -56,6 +56,8 @@ def harvest(url, label):
     n0 = len(_pool)
     for u in FUND_LINK.findall(txt):
         _pool[u] = f"{BASE}/mutual-funds/{u}/"
+    if len(txt) < 1500:
+        say(f"[discover] body of {label}: {txt[:900]!r}")
     say(f"[discover] {label}: {len(txt)} chars, {txt.count('/mutual-funds/')} links, {len(_pool) - n0} new fund pages")
     return len(_pool) - n0
 
