@@ -13,6 +13,7 @@ input,select{padding:6px;margin:0 6px 8px 0}
 </style></head><body>
 <h1>Quiet-then-Blast Backtest</h1>
 <p id="meta" class="n">Loading...</p>
+<p class="n"><a href="#ema">Jump to the EMA 20/50 cross results (8% target)</a></p>
 <p class="n"><b>The idea:</b> when a stock goes very quiet (small daily range, calm price swings), a bigger move often follows. We wait for the stock to <b>close outside</b> the quiet day's range with high volume, then buy (up) or sell (down), with a stoploss and a target.</p>
 <h2>Today's stocks matching the two chosen setups</h2><p class="n" id="cm"></p><div id="cc"></div>
 <h2>Setup comparison</h2><p class="n">Five buy-only setups, same stocks, same costs, same stoploss rule. Each is tested on the first 3 years and the last 3 years separately: trust a setup only if it makes money in both.</p>
@@ -52,4 +53,43 @@ $('cd').innerHTML=u.map(r=>'<b>'+r.label+':</b> '+r.desc).join('<br>');
 $('cs').innerHTML=u.map(r=>`<option value="${r.setup}">${r.label}</option>`).join('');
 const dr=()=>tbl('c2',[['Stock',r=>r.stock],['Entry date',r=>r.entry_date],['Entry price',r=>r.entry_price],['Stoploss',r=>r.stoploss],['Result (2x target)',r=>r.p_t2+'%',r=>cl(r.p_t2)],['Result (trailing)',r=>r.p_trail+'%',r=>cl(r.p_trail)],['Why this trade',r=>r.reason]],ct.filter(r=>r.setup==$('cs').value).reverse());
 $('cs').onchange=dr;dr()}).catch(()=>{});
+</script>
+<h2 id="ema">EMA 20/50 cross, 8% target</h2>
+<p class="n" id="em">Loading...</p>
+<p class="n"><b>The idea:</b> buy the next morning after the 20-day average (EMA) crosses above the 50-day average on a green day. Sell at +8% (a "hit"), or the next morning after the price closes below the 50-day average (the stoploss). These are past results and promise nothing. The list is today's mid/small-cap list, so stocks that dropped out of it are missing, which makes results look better than real life. Cost assumed: 0.2% per trade. "Days" are calendar days.</p>
+<div class="w"><table id="e1"></table></div>
+<h2>How fast does the 8% come?</h2>
+<p class="n">Share of the winning trades that reached 8% within this many trading days.</p>
+<div class="w"><table id="e2"></table></div>
+<h2>EMA 20/50: year by year</h2>
+<div class="w"><table id="e3"></table></div>
+<h2>EMA 20/50: stock-wise</h2>
+<select id="eg"></select><input id="es" placeholder="Search stock name"><label class="n">Min trades <input id="en" type="number" value="3" min="1" style="width:60px"></label>
+<div class="w" style="max-height:360px;overflow:auto"><table id="e4"></table></div>
+<h2>EMA 20/50: every trade</h2>
+<select id="er"><option value="">All results</option><option>HIT</option><option>STOP</option><option>OPEN</option></select><input id="eq" placeholder="Search stock name">
+<p class="n" id="ec"></p>
+<div class="w" style="max-height:520px;overflow:auto"><table id="e5"></table></div>
+<script>
+(()=>{
+const g=i=>document.getElementById(i),F=u=>fetch(u).then(r=>{if(!r.ok)throw new Error(u+' '+r.status);return r.json()});
+const c=v=>v>0?'g':v<0?'r':'',P=v=>v==null?null:v+'%',W=(b,k)=>(b.hits_within_bars||{})[k];
+const T=(id,cols,rows)=>{g(id).innerHTML='<tr>'+cols.map(x=>`<th>${x[0]}</th>`).join('')+'</tr>'+rows.map(r=>'<tr>'+cols.map(x=>{const v=x[1](r);return`<td class="${x[2]?x[2](r):''}">${v==null?'-':v}</td>`}).join('')+'</tr>').join('')};
+Promise.all([F('data/ema_cross_summary.json'),F('data/ema_cross_stocks.json'),F('data/ema_cross_trades.json')]).then(([s,st,tr])=>{
+const o=s.overall,grp=[['All stocks',o],...Object.entries(s.by_group),...Object.entries(s.by_trend)];
+g('em').textContent=`${s.stocks_tested} mid/small-cap stocks, last ${s.years} years, ${o.trades} trades. Updated ${s.updated}.`;
+const days=b=>b.avg_days_to_hit==null?null:b.avg_days_to_hit+' (median '+b.median_days_to_hit+')';
+T('e1',[['Group',r=>r[0]],['Trades',r=>r[1].trades],['Hit 8%',r=>r[1].hit],['Stopped',r=>r[1].stopped],['Hit rate',r=>P(r[1].hit_rate)],['Hit rate needed to break even',r=>P(r[1].hit_rate_needed_to_break_even)],['Avg days to hit',r=>days(r[1])],['Avg loss when stopped',r=>P(r[1].avg_loss_when_stopped),r=>c(r[1].avg_loss_when_stopped)],['Avg profit per trade',r=>P(r[1].avg_profit_per_trade_after_cost),r=>c(r[1].avg_profit_per_trade_after_cost)]],grp);
+T('e2',[['Group',r=>r[0]],['Within 5 days',r=>P(W(r[1],'5'))],['Within 10 days',r=>P(W(r[1],'10'))],['Within 20 days',r=>P(W(r[1],'20'))],['Within 40 days',r=>P(W(r[1],'40'))]],grp);
+T('e3',[['Year',r=>r[0]],['Trades',r=>r[1].trades],['Hit rate',r=>P(r[1].hit_rate)],['Hit rate needed to break even',r=>P(r[1].hit_rate_needed_to_break_even)],['Avg days to hit',r=>days(r[1])],['Avg profit per trade',r=>P(r[1].avg_profit_per_trade_after_cost),r=>c(r[1].avg_profit_per_trade_after_cost)]],Object.entries(s.by_year));
+g('eg').innerHTML='<option value="">All groups</option>'+[...new Set(st.map(x=>x.group))].map(x=>`<option>${x}</option>`).join('');
+const d4=()=>{const gr=g('eg').value,q=g('es').value.toUpperCase(),n=+g('en').value||1;
+T('e4',[['Stock',r=>r.stock],['Group',r=>r.group],['Trades',r=>r.trades],['Hit 8%',r=>r.hit],['Stopped',r=>r.stopped],['Hit rate',r=>P(r.hit_rate)],['Avg days to hit',r=>r.avg_days_to_hit],['Avg profit per trade',r=>P(r.avg_profit_per_trade_after_cost),r=>c(r.avg_profit_per_trade_after_cost)]],st.filter(r=>(!gr||r.group==gr)&&r.stock.includes(q)&&r.trades>=n))};
+g('eg').onchange=g('en').oninput=g('es').oninput=d4;d4();
+const rows=tr.slice().sort((a,b)=>a.entry_date<b.entry_date?1:-1);
+const d5=()=>{const rs=g('er').value,q=g('eq').value.toUpperCase(),f=rows.filter(r=>(!rs||r.result==rs)&&r.stock.includes(q));
+g('ec').textContent=`Showing ${Math.min(f.length,500)} of ${f.length} trades, newest first. Profit is after costs.`;
+T('e5',[['Stock',r=>r.stock],['Group',r=>r.group],['Entry date',r=>r.entry_date],['Entry price',r=>r.entry_price],['Target',r=>r.target],['Exit date',r=>r.exit_date],['Exit price',r=>r.exit_price],['Result',r=>r.result],['Profit',r=>P(r.pct_net),r=>c(r.pct_net)],['Days',r=>r.days]],f.slice(0,500))};
+g('er').onchange=g('eq').oninput=d5;d5()}).catch(e=>{g('em').textContent='No EMA 20/50 results yet. Run the "EMA 20/50 cross backtest" workflow first. ('+e+')'});
+})();
 </script></body></html>
