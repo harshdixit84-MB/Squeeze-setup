@@ -36,6 +36,8 @@ jobs:
           key: prices-v1-${{ github.run_id }}
       - name: Find today's matching stocks
         run: python backtest/scan_today.py
+      - name: Find 20/50 EMA crossovers (green candle, today)
+        run: python backtest/scan_ema_cross.py
       - name: Save results into the repo
         run: |
           git config user.name "backtest-bot"

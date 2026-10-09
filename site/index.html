@@ -10,10 +10,14 @@ th,td{border:1px solid var(--b);padding:6px 8px;text-align:left;vertical-align:t
 th{position:sticky;top:0;background:Canvas}.g{color:#16a34a;font-weight:600}.r{color:#dc2626;font-weight:600}
 .k{border:1px solid var(--b);border-radius:8px;padding:10px;margin:0 0 12px;display:grid;grid-template-columns:1fr 340px;gap:12px}@media(max-width:760px){.k{grid-template-columns:1fr}}
 input,select{padding:6px;margin:0 6px 8px 0}
+
+.tabs{display:flex;gap:8px;margin:0 0 14px;border-bottom:1px solid var(--b)}.tabs button{padding:8px 14px;border:0;border-bottom:3px solid transparent;background:none;font:inherit;cursor:pointer;color:inherit;opacity:.7}.tabs button.on{border-bottom-color:#2563eb;opacity:1;font-weight:600}
+a.tk{color:#2563eb;font-weight:600;text-decoration:none}a.tk:hover{text-decoration:underline}[hidden]{display:none!important}
 </style></head><body>
+<div class="tabs"><button id="b1" class="on">Backtest</button><button id="b2">20/50 Crossover</button></div>
+<div id="tab1">
 <h1>Quiet-then-Blast Backtest</h1>
 <p id="meta" class="n">Loading...</p>
-<p class="n"><a href="#ema">Jump to the EMA 20/50 cross results (8% target)</a></p>
 <p class="n"><b>The idea:</b> when a stock goes very quiet (small daily range, calm price swings), a bigger move often follows. We wait for the stock to <b>close outside</b> the quiet day's range with high volume, then buy (up) or sell (down), with a stoploss and a target.</p>
 <h2>Today's stocks matching the two chosen setups</h2><p class="n" id="cm"></p><div id="cc"></div>
 <h2>Setup comparison</h2><p class="n">Five buy-only setups, same stocks, same costs, same stoploss rule. Each is tested on the first 3 years and the last 3 years separately: trust a setup only if it makes money in both.</p>
@@ -27,6 +31,9 @@ input,select{padding:6px;margin:0 6px 8px 0}
 <select id="f"><option value="">Buy and Sell</option><option>buy</option><option>sell</option></select><input id="q" placeholder="Search stock name">
 <div class="w" style="max-height:520px;overflow:auto"><table id="t5"></table></div>
 <script>
+const tv=(s,t)=>`<a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+(t||String(s).replace(/[&-]/g,'_')))}" target="_blank" rel="noopener">${s}</a>`;
+</script>
+<script>
 const $=i=>document.getElementById(i),J=u=>fetch(u).then(r=>r.json());
 const cl=v=>v>0?'g':v<0?'r':'';
 function tbl(id,cols,rows){$(id).innerHTML='<tr>'+cols.map(c=>`<th>${c[0]}</th>`).join('')+'</tr>'+rows.map(r=>'<tr>'+cols.map(c=>{const v=c[1](r);return`<td class="${c[2]?c[2](r):''}">${v??'-'}</td>`}).join('')+'</tr>').join('')}
@@ -36,60 +43,46 @@ tbl('t1',[['Year',r=>r.year],['Times it appeared',r=>r.count]],s.by_year);
 const b=s.big_move;$('n2').textContent=`Share of cases where the stock moved ${b.move}% or more within ${b.days} trading days. If "after the setup" is not clearly higher than "normal days", the setup adds nothing.`;
 tbl('t2',[['',r=>r[0]],['Went up',r=>r[1].up+'%'],['Went down',r=>r[1].down+'%'],['Either way',r=>r[1].either+'%']],[['After the setup',b.after_setup],['Normal days',b.normal_days]]);
 tbl('t3',[['Direction',r=>r.direction],['Which trades',r=>r.filter],['Target',r=>r.target],['Trades',r=>r.trades],['Win rate',r=>r.win_rate+'%'],['Avg profit per trade',r=>r.avg_profit+'%',r=>cl(r.avg_profit)],['Avg on winners',r=>r.avg_win+'%'],['Avg on losers',r=>r.avg_loss+'%'],['Avg days held',r=>r.avg_days],['Verdict',r=>r.verdict]],s.results);
-tbl('t4',[['Stock',r=>r.stock],['Times it appeared',r=>r.times_appeared],['Trades',r=>r.trades],['Win rate',r=>r.win_rate==null?null:r.win_rate+'%'],['Avg profit per trade',r=>r.avg_profit==null?null:r.avg_profit+'%',r=>cl(r.avg_profit)]],st);
+tbl('t4',[['Stock',r=>tv(r.stock)],['Times it appeared',r=>r.times_appeared],['Trades',r=>r.trades],['Win rate',r=>r.win_rate==null?null:r.win_rate+'%'],['Avg profit per trade',r=>r.avg_profit==null?null:r.avg_profit+'%',r=>cl(r.avg_profit)]],st);
 const draw=()=>{const f=$('f').value,q=$('q').value.toUpperCase();
-tbl('t5',[['Stock',r=>r.stock],['Buy/Sell',r=>r.direction],['Entry date',r=>r.entry_date],['Entry price',r=>r.entry_price],['Stoploss',r=>r.stoploss],['Target',r=>r.target_2x],['Result (2x target)',r=>r.pct_2+'% - '+r.how_2,r=>cl(r.pct_2)],['Why this trade',r=>r.reason]],t.filter(r=>(!f||r.direction==f)&&r.stock.toUpperCase().includes(q)).slice(-1500).reverse())};
+tbl('t5',[['Stock',r=>tv(r.stock)],['Buy/Sell',r=>r.direction],['Entry date',r=>r.entry_date],['Entry price',r=>r.entry_price],['Stoploss',r=>r.stoploss],['Target',r=>r.target_2x],['Result (2x target)',r=>r.pct_2+'% - '+r.how_2,r=>cl(r.pct_2)],['Why this trade',r=>r.reason]],t.filter(r=>(!f||r.direction==f)&&r.stock.toUpperCase().includes(q)).slice(-1500).reverse())};
 $('f').onchange=$('q').oninput=draw;draw()}).catch(e=>$('meta').textContent='No results yet. Run the GitHub workflow first. ('+e+')');
 function chart(c){const x=c.chart,W=340,H=170,P=34,lv=[c.stoploss,c.close,c.target1,c.target2],v=x.c.concat(lv),lo=Math.min(...v),hi=Math.max(...v),y=a=>H-12-(a-lo)/(hi-lo)*(H-24),X=i=>6+i*(W-P-12)/(x.c.length-1);
 const pl=a=>a.map((v,i)=>v==null?'':X(i)+','+y(v)).filter(Boolean).join(' ');
 const L=(a,col,t)=>`<line x1="0" x2="${W-P}" y1="${y(a)}" y2="${y(a)}" stroke="${col}" stroke-dasharray="4 3"/><text x="${W-P+2}" y="${y(a)+3}" font-size="9" fill="${col}">${t} ${a}</text>`;
 return`<svg viewBox="0 0 ${W} ${H}" width="100%"><polyline fill="none" stroke="#888" points="${pl(x.m)}"/><polyline fill="none" stroke="#2563eb" stroke-width="1.6" points="${pl(x.c)}"/>${L(c.stoploss,'#dc2626','Stop')}${L(c.close,'#888','Buy')}${L(c.target1,'#16a34a','T1')}${L(c.target2,'#15803d','T2')}</svg>`}
 J('data/candidates.json').then(k=>{$('cm').textContent=k.candidates.length?`Prices up to ${k.data_date}; ${k.stocks_scanned} stocks scanned; ${k.candidates.length} match. Blue line = price, grey = 50-day average. Buy near the next morning's price; the lines are estimates from the last close.`:`No stock matched on ${k.data_date} (${k.stocks_scanned} scanned). That is normal on many days.`;
-$('cc').innerHTML=k.candidates.map(c=>`<div class="k"><div><b>${c.stock}</b> - ${c.setups.join(' + ')}<br>Last close Rs ${c.close} (${c.signal_date}). <b>Stoploss Rs ${c.stoploss}</b> (-${c.risk_pct}%), <span class="g">Target 1 Rs ${c.target1}</span>, <span class="g">Target 2 Rs ${c.target2}</span>.<p class="n"><b>Why:</b> ${c.reason} Today: ${c.below_high}% below its 1-year high, ${c.volx}x normal volume, 20-day change ${c.ret20}% (market ${c.nret20}%).</p>${c.record.map(r=>`<p class="n"><b>Past record, ${r.setup}:</b> appeared ${r.times_6y} times in 6 years; ${r.win_rate}% of trades made money; average ${r.avg_profit}% per trade (first 3 years ${r.first}%, last 3 years ${r.last}%); held about ${r.avg_days} days.</p>`).join('')}</div><div>${chart(c)}</div></div>`).join('')}).catch(()=>$('cm').textContent='Candidates not ready yet - run the Daily scan workflow.');
+$('cc').innerHTML=k.candidates.map(c=>`<div class="k"><div><b>${tv(c.stock)}</b> - ${c.setups.join(' + ')}<br>Last close Rs ${c.close} (${c.signal_date}). <b>Stoploss Rs ${c.stoploss}</b> (-${c.risk_pct}%), <span class="g">Target 1 Rs ${c.target1}</span>, <span class="g">Target 2 Rs ${c.target2}</span>.<p class="n"><b>Why:</b> ${c.reason} Today: ${c.below_high}% below its 1-year high, ${c.volx}x normal volume, 20-day change ${c.ret20}% (market ${c.nret20}%).</p>${c.record.map(r=>`<p class="n"><b>Past record, ${r.setup}:</b> appeared ${r.times_6y} times in 6 years; ${r.win_rate}% of trades made money; average ${r.avg_profit}% per trade (first 3 years ${r.first}%, last 3 years ${r.last}%); held about ${r.avg_days} days.</p>`).join('')}</div><div>${chart(c)}</div></div>`).join('')}).catch(()=>$('cm').textContent='Candidates not ready yet - run the Daily scan workflow.');
 Promise.all([J('data/compare.json'),J('data/compare_trades.json')]).then(([c,ct])=>{
 tbl('c1',[['Setup',r=>r.label],['How we exit',r=>r.exit_label],['Trades',r=>r.trades],['Win rate',r=>r.win_rate+'%'],['Avg profit per trade',r=>r.avg_profit+'%',r=>cl(r.avg_profit)],['Better than random day by',r=>r.edge+'%',r=>cl(r.edge)],['First 3 years',r=>r.first_profit+'% ('+r.first_trades+' trades)',r=>cl(r.first_profit)],['Last 3 years',r=>r.last_profit+'% ('+r.last_trades+' trades)',r=>cl(r.last_profit)],['Reached +8% in 10 days',r=>r.reach8+'%'],['Reached +10% in 10 days',r=>r.big_move+'%'],['Typical best gain in 10 days',r=>r.best_avg+'% (middle case '+r.best_med+'%)'],['Change after exactly 10 days',r=>r.day10+'%',r=>cl(r.day10)],['Verdict',r=>r.verdict]],c.setups);
 const u=[...new Map(c.setups.map(r=>[r.setup,r])).values()];
 $('cd').innerHTML=u.map(r=>'<b>'+r.label+':</b> '+r.desc).join('<br>');
 $('cs').innerHTML=u.map(r=>`<option value="${r.setup}">${r.label}</option>`).join('');
-const dr=()=>tbl('c2',[['Stock',r=>r.stock],['Entry date',r=>r.entry_date],['Entry price',r=>r.entry_price],['Stoploss',r=>r.stoploss],['Result (2x target)',r=>r.p_t2+'%',r=>cl(r.p_t2)],['Result (trailing)',r=>r.p_trail+'%',r=>cl(r.p_trail)],['Why this trade',r=>r.reason]],ct.filter(r=>r.setup==$('cs').value).reverse());
+const dr=()=>tbl('c2',[['Stock',r=>tv(r.stock)],['Entry date',r=>r.entry_date],['Entry price',r=>r.entry_price],['Stoploss',r=>r.stoploss],['Result (2x target)',r=>r.p_t2+'%',r=>cl(r.p_t2)],['Result (trailing)',r=>r.p_trail+'%',r=>cl(r.p_trail)],['Why this trade',r=>r.reason]],ct.filter(r=>r.setup==$('cs').value).reverse());
 $('cs').onchange=dr;dr()}).catch(()=>{});
 </script>
-<h2 id="ema">EMA 20/50 cross, 8% target</h2>
-<p class="n" id="em">Loading...</p>
-<p class="n"><b>The idea:</b> buy the next morning after the 20-day average (EMA) crosses above the 50-day average on a green day. Sell at +8% (a "hit"), or the next morning after the price closes below the 50-day average (the stoploss). These are past results and promise nothing. The list is today's mid/small-cap list, so stocks that dropped out of it are missing, which makes results look better than real life. Cost assumed: 0.2% per trade. "Days" are calendar days.</p>
-<div class="w"><table id="e1"></table></div>
-<h2>How fast does the 8% come?</h2>
-<p class="n">Share of the winning trades that reached 8% within this many trading days.</p>
-<div class="w"><table id="e2"></table></div>
-<h2>EMA 20/50: year by year</h2>
-<div class="w"><table id="e3"></table></div>
-<h2>EMA 20/50: stock-wise</h2>
-<select id="eg"></select><input id="es" placeholder="Search stock name"><label class="n">Min trades <input id="en" type="number" value="3" min="1" style="width:60px"></label>
-<div class="w" style="max-height:360px;overflow:auto"><table id="e4"></table></div>
-<h2>EMA 20/50: every trade</h2>
-<select id="er"><option value="">All results</option><option>HIT</option><option>STOP</option><option>OPEN</option></select><input id="eq" placeholder="Search stock name">
-<p class="n" id="ec"></p>
-<div class="w" style="max-height:520px;overflow:auto"><table id="e5"></table></div>
+</div>
+<div id="tab2" hidden>
+<h1>20/50 EMA Crossover - today</h1>
+<p class="n" id="xm">Loading...</p>
+<p class="n"><b>Rule:</b> the 20-day average (EMA) closed above the 50-day average today after being at or below it yesterday, and today's candle is green (close higher than open). Stock list: the Squeeze tab of your Google Sheet. Click a stock name to open its chart in TradingView.</p>
+<input id="xq" placeholder="Search stock / company / industry">
+<div class="w"><table id="xt"></table></div>
+</div>
 <script>
 (()=>{
-const g=i=>document.getElementById(i),F=u=>fetch(u).then(r=>{if(!r.ok)throw new Error(u+' '+r.status);return r.json()});
-const c=v=>v>0?'g':v<0?'r':'',P=v=>v==null?null:v+'%',W=(b,k)=>(b.hits_within_bars||{})[k];
-const T=(id,cols,rows)=>{g(id).innerHTML='<tr>'+cols.map(x=>`<th>${x[0]}</th>`).join('')+'</tr>'+rows.map(r=>'<tr>'+cols.map(x=>{const v=x[1](r);return`<td class="${x[2]?x[2](r):''}">${v==null?'-':v}</td>`}).join('')+'</tr>').join('')};
-Promise.all([F('data/ema_cross_summary.json'),F('data/ema_cross_stocks.json'),F('data/ema_cross_trades.json')]).then(([s,st,tr])=>{
-const o=s.overall,grp=[['All stocks',o],...Object.entries(s.by_group),...Object.entries(s.by_trend)];
-g('em').textContent=`${s.stocks_tested} mid/small-cap stocks, last ${s.years} years, ${o.trades} trades. Updated ${s.updated}.`;
-const days=b=>b.avg_days_to_hit==null?null:b.avg_days_to_hit+' (median '+b.median_days_to_hit+')';
-T('e1',[['Group',r=>r[0]],['Trades',r=>r[1].trades],['Hit 8%',r=>r[1].hit],['Stopped',r=>r[1].stopped],['Hit rate',r=>P(r[1].hit_rate)],['Hit rate needed to break even',r=>P(r[1].hit_rate_needed_to_break_even)],['Avg days to hit',r=>days(r[1])],['Avg loss when stopped',r=>P(r[1].avg_loss_when_stopped),r=>c(r[1].avg_loss_when_stopped)],['Avg profit per trade',r=>P(r[1].avg_profit_per_trade_after_cost),r=>c(r[1].avg_profit_per_trade_after_cost)]],grp);
-T('e2',[['Group',r=>r[0]],['Within 5 days',r=>P(W(r[1],'5'))],['Within 10 days',r=>P(W(r[1],'10'))],['Within 20 days',r=>P(W(r[1],'20'))],['Within 40 days',r=>P(W(r[1],'40'))]],grp);
-T('e3',[['Year',r=>r[0]],['Trades',r=>r[1].trades],['Hit rate',r=>P(r[1].hit_rate)],['Hit rate needed to break even',r=>P(r[1].hit_rate_needed_to_break_even)],['Avg days to hit',r=>days(r[1])],['Avg profit per trade',r=>P(r[1].avg_profit_per_trade_after_cost),r=>c(r[1].avg_profit_per_trade_after_cost)]],Object.entries(s.by_year));
-g('eg').innerHTML='<option value="">All groups</option>'+[...new Set(st.map(x=>x.group))].map(x=>`<option>${x}</option>`).join('');
-const d4=()=>{const gr=g('eg').value,q=g('es').value.toUpperCase(),n=+g('en').value||1;
-T('e4',[['Stock',r=>r.stock],['Group',r=>r.group],['Trades',r=>r.trades],['Hit 8%',r=>r.hit],['Stopped',r=>r.stopped],['Hit rate',r=>P(r.hit_rate)],['Avg days to hit',r=>r.avg_days_to_hit],['Avg profit per trade',r=>P(r.avg_profit_per_trade_after_cost),r=>c(r.avg_profit_per_trade_after_cost)]],st.filter(r=>(!gr||r.group==gr)&&r.stock.includes(q)&&r.trades>=n))};
-g('eg').onchange=g('en').oninput=g('es').oninput=d4;d4();
-const rows=tr.slice().sort((a,b)=>a.entry_date<b.entry_date?1:-1);
-const d5=()=>{const rs=g('er').value,q=g('eq').value.toUpperCase(),f=rows.filter(r=>(!rs||r.result==rs)&&r.stock.includes(q));
-g('ec').textContent=`Showing ${Math.min(f.length,500)} of ${f.length} trades, newest first. Profit is after costs.`;
-T('e5',[['Stock',r=>r.stock],['Group',r=>r.group],['Entry date',r=>r.entry_date],['Entry price',r=>r.entry_price],['Target',r=>r.target],['Exit date',r=>r.exit_date],['Exit price',r=>r.exit_price],['Result',r=>r.result],['Profit',r=>P(r.pct_net),r=>c(r.pct_net)],['Days',r=>r.days]],f.slice(0,500))};
-g('er').onchange=g('eq').oninput=d5;d5()}).catch(e=>{g('em').textContent='No EMA 20/50 results yet. Run the "EMA 20/50 cross backtest" workflow first. ('+e+')'});
+const $=i=>document.getElementById(i);
+const show=n=>{$('tab1').hidden=n!=2?false:true;$('tab2').hidden=n==2?false:true;$('b1').className=n==2?'':'on';$('b2').className=n==2?'on':'';history.replaceState(null,'',n==2?'#crossover':'#backtest')};
+$('b1').onclick=()=>show(1);$('b2').onclick=()=>show(2);if(location.hash=='#crossover')show(2);
+let rows=[];
+const cl=v=>v>0?'g':v<0?'r':'';
+const draw=()=>{const q=$('xq').value.toUpperCase(),f=rows.filter(r=>(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q));
+const cols=[['Stock',r=>tv(r.symbol,r.tv)],['Company',r=>r.company],['Industry',r=>r.industry],['Close',r=>r.close],['Day change',r=>r.day_pct+'%',r=>cl(r.day_pct)],['EMA 20',r=>r.ema20],['EMA 50',r=>r.ema50],['Volume vs 20-day avg',r=>r.volx==null?null:r.volx+'x']];
+$('xt').innerHTML='<tr>'+cols.map(c=>`<th>${c[0]}</th>`).join('')+'</tr>'+f.map(r=>'<tr>'+cols.map(c=>`<td class="${c[2]?c[2](r):''}">${c[1](r)??'-'}</td>`).join('')+'</tr>').join('')};
+$('xq').oninput=draw;
+fetch('data/ema_cross_today.json').then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(k=>{rows=k.stocks;
+$('xm').textContent=k.stocks.length?`Prices up to ${k.data_date}; ${k.stocks_scanned} stocks scanned; ${k.stocks.length} crossed today. Updated ${k.updated}.`:`No stock crossed on ${k.data_date} (${k.stocks_scanned} scanned). That is normal on many days.`;draw()})
+.catch(()=>$('xm').textContent='Not ready yet - run the Daily scan workflow.');
 })();
-</script></body></html>
+</script>
+</body></html>
