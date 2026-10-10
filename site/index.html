@@ -72,29 +72,39 @@ $('cs').onchange=dr;dr()}).catch(()=>{});
 </script>
 </div>
 <div id="tab2" hidden>
-<h1>20/50 EMA Crossover - today</h1>
+<h1>20/50 EMA Crossover</h1>
 <p class="n" id="xm">Loading...</p>
-<p class="n"><b>Rule:</b> the 20-day average (EMA) closed above the 50-day average today after being at or below it yesterday, and today's candle is green (close higher than open). Stock list: the Squeeze tab of your Google Sheet. Click a stock name to open its chart in TradingView.</p>
-<input id="xq" placeholder="Search stock / company / industry">
+<p class="n"><b>Rule:</b> the 20-day average (EMA) closed above the 50-day average on the day after being at or below it, and that day's candle was green (close higher than open). Stocks come from the Squeeze tab of your Google Sheet. <b>New ones are added after each trading day's scan and stay here until you delete them.</b> Click a stock name to open its chart in TradingView.</p>
+<input id="xq" placeholder="Search stock / company / industry" style="width:min(320px,100%)"> <button id="xd" disabled>Delete selected</button>
 <div class="w"><table id="xt"></table></div>
 </div>
 <script>
 (()=>{
-const $=i=>document.getElementById(i);
-const show=n=>{[1,2,3].forEach(i=>{$('tab'+i).hidden=i!=n;$('b'+i).className=i==n?'on':''});history.replaceState(null,'',['','#backtest','#crossover','#funds'][n])};
-$('b1').onclick=()=>show(1);$('b2').onclick=()=>show(2);$('b3').onclick=()=>show(3);if(location.hash=='#crossover')show(2);
-let rows=[];
-const cl=v=>v>0?'g':v<0?'r':'';
-const draw=()=>{const q=$('xq').value.toUpperCase(),f=rows.filter(r=>(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q));
-const cols=[['Stock',r=>tv(r.symbol,r.tv)],['Company',r=>r.company],['Industry',r=>r.industry],['Close',r=>r.close],['Day change',r=>r.day_pct+'%',r=>cl(r.day_pct)],['EMA 20',r=>r.ema20],['EMA 50',r=>r.ema50],['Volume vs 20-day avg',r=>r.volx==null?null:r.volx+'x']];
-$('xt').innerHTML='<tr>'+cols.map(c=>`<th>${c[0]}</th>`).join('')+'</tr>'+f.map(r=>'<tr>'+cols.map(c=>`<td class="${c[2]?c[2](r):''}">${c[1](r)??'-'}</td>`).join('')+'</tr>').join('')};
+const $=i=>document.getElementById(i),REPO='harshdixit84-MB/Squeeze-setup';
+let rows=[],hid=new Set(),sel=new Set(),dd='';
+try{hid=new Set(JSON.parse(localStorage.getItem('xhide')||'[]'))}catch(e){}
+const save=()=>{try{localStorage.setItem('xhide',JSON.stringify([...hid]))}catch(e){}};
+const key=r=>r.symbol+'|'+r.signal_date,cl=v=>v>0?'g':v<0?'r':'';
+const fd=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}):'-';
+const sg=v=>v==null?'-':(v>0?'+':'')+v+'%';
+function draw(){
+ const q=$('xq').value.toUpperCase(),f=rows.filter(r=>!hid.has(key(r))&&(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q));
+ $('xt').innerHTML='<tr><th><input type="checkbox" id="xa" title="Select all shown"></th>'+['Stock','Company','Industry','Crossed on','Close then','Latest close','Since crossover','Latest day','EMA 20','EMA 50','Volume then','20 above 50 now'].map(c=>`<th>${c}</th>`).join('')+'</tr>'+
+ f.map(r=>`<tr><td><input type="checkbox" class="xc" data-k="${key(r)}" ${sel.has(key(r))?'checked':''}></td><td>${tv(r.symbol,r.tv)}${r.signal_date==dd?' <span class="nw">NEW</span>':''}</td><td>${r.company||''}</td><td>${r.industry||''}</td><td>${fd(r.signal_date)}</td><td>${r.signal_close}</td><td>${r.last_close??'-'}</td><td class="${cl(r.since_pct)}">${sg(r.since_pct)}</td><td class="${cl(r.day_pct)}">${sg(r.day_pct)}</td><td>${r.ema20??'-'}</td><td>${r.ema50??'-'}</td><td>${r.signal_volx==null?'-':r.signal_volx+'x'}</td><td class="${r.above?'g':'r'}">${r.above?'Yes':'No'}</td></tr>`).join('')||'<tr><td colspan="13">No stocks in the list.</td></tr>';
+ document.querySelectorAll('.xc').forEach(el=>el.onchange=()=>{el.checked?sel.add(el.dataset.k):sel.delete(el.dataset.k);btn()});
+ $('xa').onchange=e=>{document.querySelectorAll('.xc').forEach(el=>{el.checked=e.target.checked;e.target.checked?sel.add(el.dataset.k):sel.delete(el.dataset.k)});btn()};btn()}
+function btn(){const n=[...sel].filter(k=>rows.some(r=>key(r)==k&&!hid.has(k))).length;$('xd').disabled=!n;$('xd').textContent=n?`Delete selected (${n})`:'Delete selected'}
 $('xq').oninput=draw;
-fetch('data/ema_cross_today.json').then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(k=>{rows=k.stocks;
-$('xm').textContent=k.stocks.length?`Prices up to ${k.data_date}; ${k.stocks_scanned} stocks scanned; ${k.stocks.length} crossed today. Updated ${k.updated}.`:`No stock crossed on ${k.data_date} (${k.stocks_scanned} scanned). That is normal on many days.`;draw()})
+$('xd').onclick=()=>{const ks=[...sel].filter(k=>rows.some(r=>key(r)==k)),sy=ks.map(k=>k.split('|')[0]);if(!ks.length)return;
+ if(!confirm('Delete '+sy.join(', ')+' from the list?\n\nThey disappear from this page now. A GitHub issue then opens - press Submit new issue so the delete also holds on your other devices.'))return;
+ ks.forEach(k=>hid.add(k));sel.clear();save();draw();
+ window.open(`https://github.com/${REPO}/issues/new?title=${encodeURIComponent('Remove crossover: '+sy.join(', '))}`,'_blank','noopener')};
+fetch('data/ema_cross_list.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(k=>{rows=k.stocks;dd=k.data_date;
+ const cur=new Set(rows.map(key));hid=new Set([...hid].filter(x=>cur.has(x)));save();                      // forget deletes the server has already applied
+ $('xm').textContent=`${rows.length} stocks in the list. Prices up to ${k.data_date}; ${k.stocks_scanned} stocks scanned; ${k.new_today||0} new on the latest scan. Updated ${k.updated}.`;draw()})
 .catch(()=>$('xm').textContent='Not ready yet - run the Daily scan workflow.');
 })();
 </script>
-
 <div id="tab3" hidden>
 <h1>Mutual Fund Portfolios</h1>
 <p class="n" id="fm0">Loading...</p>
@@ -142,7 +152,13 @@ fetch('data/mf_portfolios.json').then(r=>{if(!r.ok)throw 0;return r.json()}).the
  const st=ns.map(n=>d.funds[n].as_of).filter(Boolean).sort().pop();
  $('fm0').textContent=`${ns.length} funds tracked. Latest portfolio date: ${fmtd(st)}. Checked ${d.updated}. Yellow rows are stocks held by more than one shown fund.`;draw()})
  .catch(()=>$('fm0').textContent='Fund data not ready yet - run the Fund portfolios workflow.');
-if(location.hash=='#funds')$('b3').click();
+})();
+</script>
+<script>
+(()=>{const $=i=>document.getElementById(i);
+const show=n=>{[1,2,3].forEach(i=>{const t=$('tab'+i),b=$('b'+i);if(t)t.hidden=i!=n;if(b)b.className=i==n?'on':''});history.replaceState(null,'',['','#backtest','#crossover','#funds'][n])};
+[1,2,3].forEach(i=>$('b'+i).onclick=()=>show(i));
+show({'#crossover':2,'#funds':3}[location.hash]||1);
 })();
 </script>
 </body></html>

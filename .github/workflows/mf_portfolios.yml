@@ -24,7 +24,7 @@ concurrency:
 jobs:
   fetch:
     # issues count only when opened by the repo owner and the title mentions a fund ("Add fund: X", "Remove fund: X" or just the fund name)
-    if: github.event_name != 'issues' || (contains(github.event.issue.title, 'fund') && github.event.issue.user.login == github.repository_owner)
+    if: github.event_name != 'issues' || (contains(github.event.issue.title, 'fund') && !startsWith(github.event.issue.title, 'Remove crossover') && github.event.issue.user.login == github.repository_owner)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

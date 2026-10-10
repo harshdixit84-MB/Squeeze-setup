@@ -1,0 +1,37 @@
+name: Remove crossover stocks
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: site-data
+  cancel-in-progress: false
+jobs:
+  remove:
+    if: startsWith(github.event.issue.title, 'Remove crossover') && github.event.issue.user.login == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove from the list
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: python3 backtest/ema_cross_remove.py
+      - name: Save into the repo
+        run: |
+          git config user.name "backtest-bot"
+          git config user.email "backtest-bot@users.noreply.github.com"
+          git add site/data/ema_cross_list.json
+          git commit -m "Remove stocks from 20/50 crossover list" || echo "Nothing to save"
+          git pull --rebase origin main
+          git push
+      - name: Reply on the issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { cat /tmp/ema_remove_summary.md 2>/dev/null || echo "Something went wrong - see the workflow run."; echo; echo "The dashboard updates in about a minute."; } > /tmp/reply.md
+          gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body-file /tmp/reply.md
+          gh issue close ${{ github.event.issue.number }} --repo ${{ github.repository }}
