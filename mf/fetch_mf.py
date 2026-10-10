@@ -136,13 +136,26 @@ def parse_page(html):
 def main():
     funds = json.load(open(FUNDS_FILE)) if os.path.exists(FUNDS_FILE) else []
     funds = [dict(name=f) if isinstance(f, str) else f for f in funds]
-    # fund requested from the dashboard issue / manual run
+    # requests coming from the dashboard (GitHub issue) or a manual run
     add, url = os.environ.get("ADD_FUND", "").strip(), os.environ.get("ADD_URL", "").strip()
-    title, body = os.environ.get("ISSUE_TITLE", ""), os.environ.get("ISSUE_BODY", "")
-    if title.lower().startswith("add fund:"):
-        add = title.split(":", 1)[1].strip()
+    remove = os.environ.get("REMOVE_FUND", "").strip()
+    title, body = os.environ.get("ISSUE_TITLE", "").strip(), os.environ.get("ISSUE_BODY", "")
+    if title:
+        m = re.match(r"(?i)^(remove|delete)\s+fund\s*:?\s*(.+)$", title)
+        if m:
+            remove = m.group(2).strip()
+        else:                                            # "Add fund: X" or just the fund name as the title
+            add = re.sub(r"(?i)^add\s+fund\s*:?\s*", "", title).strip()
         m = re.search(r"https://www\.dezerv\.in/mutual-funds/\S+", body or "")
         url = m.group(0).rstrip(").,") if m else ""
+    if remove:
+        key = re.sub(r"\s+", " ", remove).lower()
+        hit = [f for f in funds if f["name"].lower() == key] or [f for f in funds if key in f["name"].lower()]
+        if len(hit) == 1:
+            funds = [f for f in funds if f is not hit[0]]
+            say(f"Removed fund: {hit[0]['name']}")
+        else:
+            say(f"FAIL remove '{remove}': " + ("no tracked fund has that name" if not hit else "name matches several funds - use the full name"))
     if add:
         add = re.sub(r"\s+", " ", add)[:120]
         hit = next((f for f in funds if f["name"].lower() == add.lower()), None)
@@ -184,7 +197,7 @@ def main():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     json.dump(data, open(OUT, "w"), separators=(",", ":"))
     json.dump(funds, open(FUNDS_FILE, "w"), indent=1)
-    open("/tmp/mf_summary.md", "w").write("\n".join(f"- {l}" for l in LOG if l.startswith(("OK", "FAIL", "Added", "'"))) or "Nothing to do.")
+    open("/tmp/mf_summary.md", "w").write("\n".join(f"- {l}" for l in LOG if l.startswith(("OK", "FAIL", "Added", "Removed", "'"))) or "Nothing to do.")
     if ok == 0 and fail:
         sys.exit("No fund could be fetched - see the messages above.")
 

@@ -19,6 +19,9 @@ a.tk{color:#2563eb;font-weight:600;text-decoration:none}a.tk:hover{text-decorati
 .fm{font-size:12px;opacity:.75;margin:0 0 6px;min-height:32px}.bar{position:relative}.bar i{position:absolute;left:0;top:0;bottom:0;background:#60a5fa55;z-index:0}.bar span{position:relative;z-index:1}
 tr.cm td{background:#fde68a33}.up{color:#16a34a}.dn{color:#dc2626}.nw{color:#2563eb;font-weight:600}
 .add{border:1px dashed var(--b);border-radius:8px;padding:10px;margin:0 0 14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{display:inline-flex;align-items:center;gap:8px;padding:5px 6px 5px 12px;border:1px solid var(--b);border-radius:999px;cursor:pointer;font-size:13px;opacity:.6;user-select:none}
+.chip.on{opacity:1;background:#dbeafe;border-color:#2563eb;font-weight:600}.chip .x{width:20px;height:20px;line-height:19px;text-align:center;border-radius:50%;font-size:15px}.chip .x:hover{background:#fecaca;color:#b91c1c}
+.fs{grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr))!important}table.sm{font-size:12px}table.sm td,table.sm th{padding:3px 6px}
 </style></head><body>
 <div class="tabs"><button id="b1" class="on">Backtest</button><button id="b2">20/50 Crossover</button><button id="b3">Fund Portfolios</button></div>
 <div id="tab1">
@@ -95,43 +98,49 @@ $('xm').textContent=k.stocks.length?`Prices up to ${k.data_date}; ${k.stocks_sca
 <div id="tab3" hidden>
 <h1>Mutual Fund Portfolios</h1>
 <p class="n" id="fm0">Loading...</p>
-<div class="add"><b>Add a fund:</b> <input id="fa" placeholder="Fund name, e.g. HDFC Mid-Cap Opportunities Fund" style="width:min(420px,100%)"> <button id="fb">Add fund</button>
-<p class="n" style="margin:6px 0 0">Opens a pre-filled GitHub issue - press <b>Submit new issue</b>. Within about 2 minutes the fund's latest portfolio is fetched and appears below (refresh the page). Portfolios refresh by themselves every month after the fund house publishes. You can paste the fund's dezerv.in page link into the issue text if the name is not found.</p></div>
-<input id="ff" placeholder="Find a stock in the selected funds" style="width:min(320px,100%)">
-<datalist id="fl"></datalist>
+<div class="add"><b>Add a fund:</b> <input id="fa" placeholder="Fund name, e.g. HSBC Midcap Fund" style="width:min(420px,100%)"> <button id="fb">Add fund</button>
+<p class="n" style="margin:6px 0 0">Opens a pre-filled GitHub issue - just press <b>Submit new issue</b> and leave the title as it is. In about 2 minutes the fund's latest portfolio is fetched and shows up here (refresh the page). Portfolios then refresh by themselves every month. If the name is not found, paste the fund's dezerv.in page link into the issue text.</p></div>
+<p class="n" style="margin:0 0 4px"><b>Your funds</b> - click a name to show / hide it, click &times; to delete it. <a href="#" id="fall">Show all</a> | <a href="#" id="fnone">Hide all</a></p>
+<div id="fchips" class="chips"></div>
+<input id="ff" placeholder="Find a stock in the shown funds" style="width:min(320px,100%);margin:8px 0">
 <div class="fs" id="fgrid"></div>
 </div>
 <script>
 (()=>{
-const $=i=>document.getElementById(i),REPO='harshdixit84-MB/Squeeze-setup',SL=3;
-let D={funds:{}},sel=[];
-try{sel=JSON.parse(localStorage.getItem('mfsel')||'[]')}catch(e){}
+const $=i=>document.getElementById(i),REPO='harshdixit84-MB/Squeeze-setup';
+let D={funds:{}},shown=new Set();
+const ls=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k)||'null');localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const find=q=>{q=(q||'').trim().toLowerCase();if(!q)return null;const ns=Object.keys(D.funds);return ns.find(n=>n.toLowerCase()==q)||ns.find(n=>(n+' '+(D.funds[n].matched||'')).toLowerCase().includes(q))||null};
 const fmtd=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'n/a';
-function draw(){
- const q=$('ff').value.trim().toLowerCase(),fs=sel.map(find);
- const cnt={};fs.forEach(n=>{if(n)new Set(D.funds[n].holdings.map(h=>h.s.toLowerCase())).forEach(s=>cnt[s]=(cnt[s]||0)+1)});
- $('fgrid').innerHTML=sel.map((v,i)=>{const n=fs[i],f=n&&D.funds[n];
-  let body='<p class="fm">Pick a fund from the list or type part of its name.</p>';
-  if(v&&!f)body='<p class="fm">Fund not found. Use <b>Add a fund</b> above to fetch it.</p>';
-  if(f){const pm={};(f.prev||[]).forEach(h=>pm[h.s.toLowerCase()]=h.p);const hasPrev=!!(f.prev&&f.prev.length),mx=Math.max(...f.holdings.map(h=>h.p),0.01);
-   const tot=f.holdings.reduce((a,h)=>a+h.p,0),rows=f.holdings.filter(h=>!q||h.s.toLowerCase().includes(q));
-   body=`<p class="fm"><b>${esc(f.matched||f.name)}</b><br>${f.holdings.length} holdings | total ${tot.toFixed(2)}% | as of ${fmtd(f.as_of)}${f.fund_size_cr?' | size Rs '+Math.round(f.fund_size_cr).toLocaleString('en-IN')+' Cr':''}${hasPrev?' | change vs '+fmtd(f.prev_as_of):''}${f.error?'<br><span class="dn">Last refresh problem: '+esc(f.error)+'</span>':''}${f.url?' | <a href="'+esc(f.url)+'" target="_blank" rel="noopener">source</a>':''}</p>
-   <div class="w" style="max-height:640px;overflow:auto"><table><tr><th>#</th><th>Stock</th><th>Allocation</th><th>Rs Cr</th>${hasPrev?'<th>Change</th>':''}</tr>${rows.map((h,k)=>{const k2=h.s.toLowerCase(),pv=pm[k2];
-   let ch='';if(hasPrev){ch=pv==null?'<td class="nw">NEW</td>':(()=>{const d=+(h.p-pv).toFixed(2);return`<td class="${d>0?'up':d<0?'dn':''}">${d>0?'+':''}${d}</td>`})()}
-   return`<tr class="${cnt[k2]>1?'cm':''}"><td>${f.holdings.indexOf(h)+1}</td><td>${esc(h.s)}</td><td class="bar"><i style="width:${(100*h.p/mx).toFixed(0)}%"></i><span>${h.p.toFixed(2)}%</span></td><td>${h.cr==null?'-':h.cr.toLocaleString('en-IN')}</td>${ch}</tr>`}).join('')}</table></div>`}
-  return`<div><input class="fi" list="fl" data-i="${i}" value="${esc(v)}" placeholder="Fund ${i+1} - type or pick">${body}</div>`}).join('');
- document.querySelectorAll('.fi').forEach(el=>{el.onchange=()=>{sel[+el.dataset.i]=el.value;localStorage.setItem('mfsel',JSON.stringify(sel));draw()}});
+const issue=t=>window.open(`https://github.com/${REPO}/issues/new?title=${encodeURIComponent(t)}`,'_blank','noopener');
+function chips(){const ns=Object.keys(D.funds);
+ $('fchips').innerHTML=ns.map((n,i)=>`<span class="chip ${shown.has(n)?'on':''}" data-i="${i}">${esc(n)}<b class="x" data-x="${i}" title="Delete this fund">&times;</b></span>`).join('')||'<span class="n">No funds yet - add one above.</span>';
+ $('fchips').querySelectorAll('.chip').forEach(el=>el.onclick=e=>{const n=ns[+el.dataset.i];
+  if(e.target.dataset.x!==undefined){if(confirm('Delete "'+n+'" from the dashboard?\n\nThis opens a GitHub issue - press Submit new issue to confirm.'))issue('Remove fund: '+n);return}
+  shown.has(n)?shown.delete(n):shown.add(n);ls('mfshown',[...shown]);draw()})}
+function draw(){chips();
+ const q=$('ff').value.trim().toLowerCase(),ns=Object.keys(D.funds).filter(n=>shown.has(n));
+ const cnt={};ns.forEach(n=>new Set(D.funds[n].holdings.map(h=>h.s.toLowerCase())).forEach(s=>cnt[s]=(cnt[s]||0)+1));
+ $('fgrid').innerHTML=ns.map(n=>{const f=D.funds[n],hasPrev=!!(f.prev&&f.prev.length),pm={};(f.prev||[]).forEach(h=>pm[h.s.toLowerCase()]=h.p);
+  const mx=Math.max(...f.holdings.map(h=>h.p),0.01),tot=f.holdings.reduce((a,h)=>a+h.p,0),cur=new Set(f.holdings.map(h=>h.s.toLowerCase()));
+  const rows=f.holdings.map((h,k)=>({h,k})).filter(r=>!q||r.h.s.toLowerCase().includes(q));
+  const exited=hasPrev?f.prev.filter(h=>!cur.has(h.s.toLowerCase())&&h.t!=='Cash'&&!/^(treps|net current|cash margin)/i.test(h.s)):[];
+  return`<div class="fc"><p class="fm"><b>${esc(f.matched||f.name)}</b><br>${f.holdings.length} holdings | total ${tot.toFixed(2)}% | as of ${fmtd(f.as_of)}${f.fund_size_cr?' | Rs '+Math.round(f.fund_size_cr).toLocaleString('en-IN')+' Cr':''}${f.url?' | <a href="'+esc(f.url)+'" target="_blank" rel="noopener">source</a>':''}<br>${hasPrev?'Change compared with '+fmtd(f.prev_as_of)+' (percentage points)':'<span class="n">Previous month not stored yet - the Change column fills in automatically when this fund publishes its next monthly portfolio.</span>'}${f.error?'<br><span class="dn">Last refresh problem: '+esc(f.error)+'</span>':''}</p>
+  <div class="w" style="max-height:620px;overflow:auto"><table class="sm"><tr><th>#</th><th>Stock</th><th>Now %</th><th>Prev %</th><th>Change</th><th>Rs Cr</th></tr>${rows.map(({h,k})=>{const k2=h.s.toLowerCase(),pv=pm[k2];
+   let pc='<td>-</td>',ch='<td>-</td>';
+   if(hasPrev){if(pv==null){pc='<td>-</td>';ch='<td class="nw">NEW</td>'}else{const d=+(h.p-pv).toFixed(2);pc=`<td>${pv.toFixed(2)}</td>`;ch=`<td class="${d>0?'up':d<0?'dn':''}">${d>0?'+':''}${d.toFixed(2)}</td>`}}
+   return`<tr class="${cnt[k2]>1?'cm':''}"><td>${k+1}</td><td>${esc(h.s)}</td><td class="bar"><i style="width:${(100*h.p/mx).toFixed(0)}%"></i><span>${h.p.toFixed(2)}</span></td>${pc}${ch}<td>${h.cr==null?'-':h.cr.toLocaleString('en-IN')}</td></tr>`}).join('')}</table></div>
+  ${exited.length?`<p class="n"><b>Sold out since ${fmtd(f.prev_as_of)}:</b> ${exited.map(h=>esc(h.s)+' ('+h.p.toFixed(2)+'%)').join(', ')}</p>`:''}</div>`}).join('')||'<p class="n">No fund is shown - click a fund name above.</p>';
 }
 $('ff').oninput=draw;
-$('fb').onclick=()=>{const n=$('fa').value.trim();if(!n){$('fa').focus();return}
- window.open(`https://github.com/${REPO}/issues/new?title=${encodeURIComponent('Add fund: '+n)}&body=${encodeURIComponent('Optional: paste the fund page link from dezerv.in here if the name alone does not work.\n')}`,'_blank','noopener')};
-fetch('data/mf_portfolios.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{D=d;const ns=Object.keys(d.funds);
- $('fl').innerHTML=ns.map(n=>`<option value="${esc(n)}">`).join('');
- if(!sel.length||sel.every(s=>!s))sel=ns.slice(0,SL);while(sel.length<SL)sel.push('');sel=sel.slice(0,SL);
+$('fall').onclick=e=>{e.preventDefault();shown=new Set(Object.keys(D.funds));ls('mfshown',[...shown]);draw()};
+$('fnone').onclick=e=>{e.preventDefault();shown=new Set();ls('mfshown',[]);draw()};
+$('fb').onclick=()=>{const n=$('fa').value.trim();if(!n){$('fa').focus();return}issue('Add fund: '+n)};
+fetch('data/mf_portfolios.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{D=d;const ns=Object.keys(d.funds),known=ls('mfknown')||[],old=ls('mfshown');
+ shown=new Set((old||[]).filter(n=>ns.includes(n)));ns.filter(n=>!known.includes(n)).forEach(n=>shown.add(n));   // newly added funds appear automatically
+ ls('mfknown',ns);ls('mfshown',[...shown]);
  const st=ns.map(n=>d.funds[n].as_of).filter(Boolean).sort().pop();
- $('fm0').textContent=`${ns.length} funds tracked. Latest portfolio date: ${fmtd(st)}. Checked ${d.updated}. Yellow rows are stocks held by more than one selected fund.`;draw()})
+ $('fm0').textContent=`${ns.length} funds tracked. Latest portfolio date: ${fmtd(st)}. Checked ${d.updated}. Yellow rows are stocks held by more than one shown fund.`;draw()})
  .catch(()=>$('fm0').textContent='Fund data not ready yet - run the Fund portfolios workflow.');
 if(location.hash=='#funds')$('b3').click();
 })();

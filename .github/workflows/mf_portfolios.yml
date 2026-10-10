@@ -10,6 +10,9 @@ on:
       fund_url:
         description: "dezerv.in page link of that fund (optional)"
         required: false
+      remove_fund:
+        description: "Fund to remove (optional)"
+        required: false
   issues:
     types: [opened]
 permissions:
@@ -20,8 +23,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   fetch:
-    # issues only count when they come from the repo owner and start with "Add fund:"
-    if: github.event_name != 'issues' || (startsWith(github.event.issue.title, 'Add fund:') && github.event.issue.user.login == github.repository_owner)
+    # issues count only when opened by the repo owner and the title mentions a fund ("Add fund: X", "Remove fund: X" or just the fund name)
+    if: github.event_name != 'issues' || (contains(github.event.issue.title, 'fund') && github.event.issue.user.login == github.repository_owner)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -34,6 +37,7 @@ jobs:
         env:
           ADD_FUND: ${{ github.event.inputs.fund_name }}
           ADD_URL: ${{ github.event.inputs.fund_url }}
+          REMOVE_FUND: ${{ github.event.inputs.remove_fund }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: python mf/fetch_mf.py
