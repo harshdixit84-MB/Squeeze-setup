@@ -25,6 +25,7 @@ def to_4h(df, now):
     mins = np.where(t.dt.hour * 60 + t.dt.minute < 13 * 60 + 15, 9 * 60 + 15, 13 * 60 + 15)
     df = df.assign(bar=t.dt.normalize() + pd.to_timedelta(mins, unit="m"))
     g = df.groupby("bar").agg(Open=("open", "first"), High=("high", "max"), Low=("low", "min"), Close=("close", "last"), Volume=("volume", "sum"))
+    g = g.astype(float)                                   # volume must be float: split fixes divide it
     g.index.name = "date"
     end = pd.Series([s + (pd.Timedelta(hours=4) if s.hour == 9 else pd.Timedelta(hours=2, minutes=15)) for s in g.index], index=g.index)
     return g[end <= now]
