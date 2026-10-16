@@ -1,6 +1,7 @@
 """Monthly Supertrend (10, 3) flips for the "Monthly Supertrend" tab on the dashboard.
 Monthly candles are built from the daily prices in ./data/ (downloaded by fetch_data.py from Angel One). Only fully closed months are used.
 Signal = Supertrend turned GREEN (or RED) on the last closed month.
+  "SP pullback": a kept stock whose trend is still the same colour and whose price is back within 3% of the Supertrend line
   green flip: skipped if that month's candle is a hammer or has a long upper wick
   red flip  : mirror image - skipped if it is a shooting star or has a long lower wick
 Every stock found is KEPT in site/data/supertrend_list.json until you delete it (or tick Buy, which moves it to the positions table).
@@ -15,6 +16,7 @@ DATA_DIR, OUT_DIR = os.environ.get("DATA_DIR", "data"), os.environ.get("OUT_DIR"
 LIST, POS = f"{OUT_DIR}/supertrend_list.json", f"{OUT_DIR}/st_positions.json"
 ATR_LEN, MULT, MIN_MONTHS = 10, 3.0, 14
 MONTHS_BACK = int(os.environ.get("MONTHS_BACK", "1"))     # 1 = only the last closed month; use 3 once to also pick up flips of the last 3 months
+PULLBACK_PCT = 3.0                                        # "SP pullback": price is within 3% of the Supertrend line again
 WICK_MAX = 0.40                                           # a wick longer than 40% of the candle's high-low range counts as "long"
 HAMMER_RATIO = 2.0                                        # hammer / shooting star: long wick >= 2x the body, tiny wick on the other side
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -112,6 +114,10 @@ def main():
         if m:
             e.update(last_date=str(m["date"].date()), last_close=m["last_close"], high52=m["high52"], low52=m["low52"], st_now=m["st_now"],
                      st_line=m["st_line"], since_pct=round(100 * (m["last_close"] / e["signal_close"] - 1), 2))
+            # gap between price and the Supertrend line, measured on the trend side (green: price above the line, red: price below it)
+            gap = 100 * ((m["last_close"] - m["st_line"]) if side == "green" else (m["st_line"] - m["last_close"])) / m["st_line"]
+            e["gap_pct"] = round(gap, 2)
+            e["pullback"] = bool(m["st_now"] == side and 0 <= gap <= PULLBACK_PCT)    # trend still the same colour and price is back near the line
     stocks = sorted(tracked.values(), key=lambda e: (e["signal_date"], e["symbol"]), reverse=True)
     json.dump(dict(updated=now.strftime("%d %b %Y %H:%M"), data_date=str(last_date.date()) if last_date is not None else state.get("data_date"),
                    stocks_scanned=scanned, new_count=new, stocks=stocks, removed=removed), open(LIST, "w"))

@@ -195,8 +195,8 @@ fetch('data/vtd_list.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(k=>
 <div id="tab5" hidden>
 <h1>Monthly Supertrend</h1>
 <p class="n" id="sm">Loading...</p>
-<p class="n"><b>Rule:</b> on the monthly chart the Supertrend (10, 3) changed colour on the last closed month. <b>Green</b> list: it turned green and that month's candle is not a hammer and has no long upper wick. <b>Red</b> list: the mirror image (not a shooting star, no long lower wick). Stocks come from the Squeeze tab of your Google Sheet, prices from Angel One. <b>Stocks stay here until you delete them or tick Buy.</b> Click a stock name to open its monthly chart in TradingView.</p>
-<select id="ss"><option value="green">Supertrend turned GREEN</option><option value="red">Supertrend turned RED</option></select>
+<p class="n"><b>Rule:</b> on the monthly chart the Supertrend (10, 3) changed colour on the last closed month. <b>Green</b> list: it turned green and that month's candle is not a hammer and has no long upper wick. <b>Red</b> list: the mirror image (not a shooting star, no long lower wick). Stocks come from the Squeeze tab of your Google Sheet, prices from Angel One. <b>SP pullback:</b> stocks from the green / red lists whose trend is still the same colour and whose price has come back to within 3% of the Supertrend line (green: price above the line; red: price below it). They leave this view when the price moves more than 3% away. <b>Stocks stay in the green / red lists until you delete them or tick Buy.</b> Click a stock name to open its monthly chart in TradingView.</p>
+<select id="ss"><option value="green">Supertrend turned GREEN</option><option value="red">Supertrend turned RED</option><option value="pullback">SP pullback</option></select>
 <input id="sq" placeholder="Search stock / company / industry" style="width:min(320px,100%)"> <button id="sd" disabled>Delete selected</button>
 <div class="w"><table id="st"></table></div>
 <h2>My trades (bought from this list)</h2>
@@ -234,9 +234,9 @@ function visibleClosed(){
 }
 function draw(){
  const q=$('sq').value.toUpperCase(),sd=$('ss').value;
- const f=L.stocks.filter(r=>r.side==sd&&!hid.has(key(r))&&!pb.some(b=>b.symbol==r.symbol&&b.signal_date==r.signal_date)&&(r.symbol+' '+(r.company||'')+' '+(r.industry||'')).toUpperCase().includes(q));
- $('st').innerHTML='<tr><th><input type="checkbox" id="sa" title="Select all shown"></th>'+['Stock','Company','Industry','Supertrend turned '+sd+' on','Current price','52W high','52W low','Since then','Supertrend now','Buy'].map(c=>`<th>${c}</th>`).join('')+'</tr>'+
- (f.map(r=>`<tr><td><input type="checkbox" class="sc" data-k="${esc(key(r))}" ${sel.has(key(r))?'checked':''}></td><td>${link(r)}</td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td><td>${fd(r.signal_date)}</td><td>${r.last_close??'-'}</td><td>${r.high52??'-'}</td><td>${r.low52??'-'}</td><td class="${cl(r.since_pct)}">${r.since_pct==null?'-':sg(r.since_pct)+'%'}</td><td class="${r.st_now=='green'?'g':'r'}">${r.st_now||'-'}</td><td><input type="checkbox" class="sb" data-k="${esc(key(r))}" title="Mark as bought"></td></tr>`).join('')||`<tr><td colspan="11">No ${sd} stocks in the list right now.</td></tr>`);
+ const pbk=sd=='pullback',f=L.stocks.filter(r=>(pbk?r.pullback:r.side==sd)&&!hid.has(key(r))&&!pb.some(b=>b.symbol==r.symbol&&b.signal_date==r.signal_date)&&(r.symbol+' '+(r.company||'')+' '+(r.industry||'')).toUpperCase().includes(q));
+ $('st').innerHTML='<tr><th><input type="checkbox" id="sa" title="Select all shown"></th>'+['Stock','Company','Industry'].concat(pbk?['Trend'] :[],[pbk?'Supertrend turned on':'Supertrend turned '+sd+' on','Current price','SP line','Gap to SP line','52W high','52W low','Since then','Supertrend now','Buy']).map(c=>`<th>${c}</th>`).join('')+'</tr>'+
+ (f.map(r=>`<tr><td><input type="checkbox" class="sc" data-k="${esc(key(r))}" ${sel.has(key(r))?'checked':''}></td><td>${link(r)}</td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td>${pbk?`<td class="${r.side=='green'?'g':'r'}">${r.side}</td>`:''}<td>${fd(r.signal_date)}</td><td>${r.last_close??'-'}</td><td>${r.st_line??'-'}</td><td>${r.gap_pct==null?'-':r.gap_pct.toFixed(2)+'%'}</td><td>${r.high52??'-'}</td><td>${r.low52??'-'}</td><td class="${cl(r.since_pct)}">${r.since_pct==null?'-':sg(r.since_pct)+'%'}</td><td class="${r.st_now=='green'?'g':'r'}">${r.st_now||'-'}</td><td><input type="checkbox" class="sb" data-k="${esc(key(r))}" title="Mark as bought"></td></tr>`).join('')||`<tr><td colspan="14">${pbk?'No stock is within 3% of its Supertrend line right now.':'No '+sd+' stocks in the list right now.'}</td></tr>`);
  document.querySelectorAll('.sc').forEach(el=>el.onchange=()=>{el.checked?sel.add(el.dataset.k):sel.delete(el.dataset.k);btn()});
  $('sa').onchange=e=>{document.querySelectorAll('.sc').forEach(el=>{el.checked=e.target.checked;e.target.checked?sel.add(el.dataset.k):sel.delete(el.dataset.k)});btn()};
  document.querySelectorAll('.sb').forEach(el=>el.onchange=()=>buy(el));
@@ -274,8 +274,8 @@ function drawPos(){
 Promise.all([fetch('data/supertrend_list.json').then(r=>{if(!r.ok)throw 0;return r.json()}),fetch('data/st_positions.json').then(r=>r.ok?r.json():{open:[],closed:[]}).catch(()=>({open:[],closed:[]}))]).then(([k,p])=>{
  L=k;P=p;const cur=new Set(L.stocks.map(key));hid=new Set([...hid].filter(x=>cur.has(x)));sv('sthide',[...hid]);
  const all=P.open.concat(P.closed).map(x=>x.symbol+'@'+x.buy_date);pr=new Set([...pr].filter(x=>all.includes(x)));sv('strem',[...pr]);
- const g=L.stocks.filter(r=>r.side=='green').length,rd=L.stocks.filter(r=>r.side=='red').length;
- $('sm').textContent=k.data_date?`${g} green and ${rd} red stocks in the list. Prices up to ${k.data_date}; ${k.stocks_scanned} stocks scanned; ${k.new_count||0} new on the latest scan. Updated ${k.updated}.`:'No scan has run yet - run the Daily scan workflow.';
+ const g=L.stocks.filter(r=>r.side=='green').length,rd=L.stocks.filter(r=>r.side=='red').length;const pb2=L.stocks.filter(r=>r.pullback).length;
+ $('sm').textContent=k.data_date?`${g} green and ${rd} red stocks in the list, ${pb2} in SP pullback. Prices up to ${k.data_date}; ${k.stocks_scanned} stocks scanned; ${k.new_count||0} new on the latest scan. Updated ${k.updated}.`:'No scan has run yet - run the Daily scan workflow.';
  draw()}).catch(()=>{$('sm').textContent='Not ready yet - run the Daily scan workflow.';draw()});
 })();
 </script>
