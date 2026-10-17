@@ -11,6 +11,8 @@ from datetime import datetime, timedelta, timezone
 import numpy as np, pandas as pd
 from run_backtest import load, fix_splits
 from scan_ema_cross import read_sheet
+from fetch_data import SHEET_CSV
+import io, requests
 
 DATA_DIR, OUT_DIR = os.environ.get("DATA_DIR", "data"), os.environ.get("OUT_DIR", "site/data")
 LIST, POS = f"{OUT_DIR}/supertrend_list.json", f"{OUT_DIR}/st_positions.json"
@@ -66,7 +68,24 @@ def monthly(d, now):
     return m[m.index < pd.Period(now, "M")]               # the month that is still running is not a candle yet
 
 
+def save_squeeze_page():
+    """Writes the whole Squeeze tab (every row, any series) to site/data/squeeze_list.json for the "Squeeze List" page. Keeps the old file if the sheet can't be read."""
+    try:
+        r = requests.get(SHEET_CSV, timeout=60)
+        r.raise_for_status()
+        df = pd.read_csv(io.StringIO(r.text)).dropna(subset=["Symbol"])
+        rows = [dict(symbol=str(x["Symbol"]).strip(), tv=str(x["Symbol"]).strip().replace("&", "_").replace("-", "_"),
+                     company=str(x.get("Company Name", "")).strip(), industry=str(x.get("Industry", "")).strip(), series=str(x.get("Series", "")).strip())
+                for _, x in df.iterrows()]
+        if len(rows) > 50:
+            json.dump(dict(updated=datetime.now(IST).strftime("%d %b %Y %H:%M"), count=len(rows), stocks=rows), open(f"{OUT_DIR}/squeeze_list.json", "w"))
+            print(f"Squeeze list page: {len(rows)} stocks")
+    except Exception as ex:
+        print(f"::warning::Could not refresh the Squeeze list page ({ex})")
+
+
 def main():
+    save_squeeze_page()
     sheet = read_sheet()
     state = json.load(open(LIST)) if os.path.exists(LIST) else {}
     tracked = {(s["symbol"], s["side"]): s for s in state.get("stocks", [])}

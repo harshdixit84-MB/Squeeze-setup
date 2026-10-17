@@ -1,0 +1,29 @@
+name: Refresh Squeeze list
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"          # 8:30 AM India time, picks up any change you made in the sheet
+permissions:
+  contents: write
+concurrency:
+  group: site-data
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r backtest/requirements.txt
+      - run: python backtest/save_squeeze_list.py
+      - name: Save into the repo
+        run: |
+          git config user.name "backtest-bot"
+          git config user.email "backtest-bot@users.noreply.github.com"
+          git add site/data/squeeze_list.json
+          git commit -m "Refresh Squeeze list" || echo "Nothing new to save"
+          git pull --rebase origin main
+          git push

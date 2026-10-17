@@ -23,7 +23,7 @@ tr.cm td{background:#fde68a33}.up{color:#16a34a}.dn{color:#dc2626}.nw{color:#256
 .chip.on{opacity:1;background:#dbeafe;border-color:#2563eb;font-weight:600}.chip .x{width:20px;height:20px;line-height:19px;text-align:center;border-radius:50%;font-size:15px}.chip .x:hover{background:#fecaca;color:#b91c1c}
 .fs{grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr))!important}table.sm{font-size:12px}table.sm td,table.sm th{padding:3px 6px}
 </style></head><body>
-<div class="tabs"><button id="b1" class="on">Backtest</button><button id="b2">20/50 Crossover</button><button id="b3">Fund Portfolios</button><button id="b4">VTD 4H Buy</button><button id="b5">Monthly Supertrend</button></div>
+<div class="tabs"><button id="b1" class="on">Backtest</button><button id="b2">20/50 Crossover</button><button id="b3">Fund Portfolios</button><button id="b4">VTD 4H Buy</button><button id="b5">Monthly Supertrend</button><button id="b6">Squeeze List</button></div>
 <div id="tab1">
 <h1>Quiet-then-Blast Backtest</h1>
 <p id="meta" class="n">Loading...</p>
@@ -279,11 +279,35 @@ Promise.all([fetch('data/supertrend_list.json').then(r=>{if(!r.ok)throw 0;return
  draw()}).catch(()=>{$('sm').textContent='Not ready yet - run the Daily scan workflow.';draw()});
 })();
 </script>
+<div id="tab6" hidden>
+<h1>Squeeze List</h1>
+<p class="n" id="qm">Loading...</p>
+<p class="n">Every stock in the Squeeze tab of your Google Sheet. Click a stock name to open its chart in TradingView. The list refreshes every morning and with each Daily scan.</p>
+<input id="qq" placeholder="Search stock / company / industry" style="width:min(320px,100%)"> <select id="qi"><option value="">All industries</option></select>
+<div class="w"><table id="qt"></table></div>
+</div>
+<script>
+(()=>{
+const $=i=>document.getElementById(i);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let R=[];
+function draw(){
+ const q=$('qq').value.toUpperCase(),ind=$('qi').value,f=R.filter(r=>(!ind||r.industry==ind)&&(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q));
+ $('qt').innerHTML='<tr>'+['#','Stock','Company','Industry','Series'].map(c=>`<th>${c}</th>`).join('')+'</tr>'+
+ (f.map((r,i)=>`<tr><td>${i+1}</td><td><a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+r.tv)}" target="_blank" rel="noopener">${esc(r.symbol)}</a></td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td><td>${esc(r.series)}</td></tr>`).join('')||'<tr><td colspan="5">No stock matches.</td></tr>');
+ $('qm').textContent=`${f.length} of ${R.length} stocks shown.`;
+}
+$('qq').oninput=$('qi').onchange=draw;
+fetch('data/squeeze_list.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(k=>{R=k.stocks;
+ [...new Set(R.map(r=>r.industry).filter(Boolean))].sort().forEach(i=>{const o=document.createElement('option');o.value=o.textContent=i;$('qi').appendChild(o)});draw()})
+.catch(()=>$('qm').textContent='Not ready yet - run the Refresh Squeeze list workflow.');
+})();
+</script>
 <script>
 (()=>{const $=i=>document.getElementById(i);
-const show=n=>{[1,2,3,4,5].forEach(i=>{const t=$('tab'+i),b=$('b'+i);if(t)t.hidden=i!=n;if(b)b.className=i==n?'on':''});history.replaceState(null,'',['','#backtest','#crossover','#funds','#vtd','#supertrend'][n])};
-[1,2,3,4,5].forEach(i=>$('b'+i).onclick=()=>show(i));
-show({'#crossover':2,'#funds':3,'#vtd':4,'#supertrend':5}[location.hash]||1);
+const show=n=>{[1,2,3,4,5,6].forEach(i=>{const t=$('tab'+i),b=$('b'+i);if(t)t.hidden=i!=n;if(b)b.className=i==n?'on':''});history.replaceState(null,'',['','#backtest','#crossover','#funds','#vtd','#supertrend','#squeeze'][n])};
+[1,2,3,4,5,6].forEach(i=>$('b'+i).onclick=()=>show(i));
+show({'#crossover':2,'#funds':3,'#vtd':4,'#supertrend':5,'#squeeze':6}[location.hash]||1);
 })();
 </script>
 </body></html>
