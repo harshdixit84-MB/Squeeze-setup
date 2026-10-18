@@ -54,6 +54,7 @@ def main():
     tracked = {s["symbol"]: s for s in state.get("stocks", [])}
     removed = state.get("removed", {})                      # symbol -> signal date the user deleted (so it is not re-added)
     metrics, cands, last_date, scanned = {}, [], None, 0
+    diag_any, diag_green, above_now = {}, {}, 0               # context numbers: how many stocks crossed in each recent month
     for f in sorted(glob.glob(f"{DATA_DIR}/*.csv")):
         key = os.path.basename(f)[:-4]
         if key.startswith("_") or (sheet and key not in sheet):
@@ -71,6 +72,12 @@ def main():
         e20, e50 = c.ewm(span=FAST, adjust=False).mean(), c.ewm(span=SLOW, adjust=False).mean()
         sym, name, ind = sheet.get(key, (key, "", ""))
         dc = d["Close"]
+        cx, gr = (e20 > e50) & (e20.shift() <= e50.shift()), c > m["Open"]
+        for p in m.index[-8:]:
+            if cx[p]:
+                diag_any[str(p)] = diag_any.get(str(p), 0) + 1
+                diag_green[str(p)] = diag_green.get(str(p), 0) + int(bool(gr[p]))
+        above_now += int(e20.iloc[-1] > e50.iloc[-1])
         metrics[sym] = dict(date=d.index[-1], last_close=round(float(dc.iloc[-1]), 2), day_pct=round(100 * (float(dc.iloc[-1]) / float(dc.iloc[-2]) - 1), 2),
                             ema20=round(float(e20.iloc[-1]), 2), ema50=round(float(e50.iloc[-1]), 2), above=bool(e20.iloc[-1] > e50.iloc[-1]))
         if e20.iloc[-1] > e50.iloc[-1] and e20.iloc[-2] <= e50.iloc[-2] and c.iloc[-1] > m["Open"].iloc[-1]:
@@ -100,7 +107,8 @@ def main():
     latest_signal = max((x["sdate"] for _, x in cands if x["month"] == latest_month), default=None)
     json.dump(dict(timeframe="monthly", updated=datetime.now(IST).strftime("%d %b %Y %H:%M"), data_date=str(last_date.date()) if last_date is not None else state.get("data_date"),
                    latest_month=str(latest_month) if latest_month is not None else None, latest_signal=latest_signal,
-                   stocks_scanned=scanned, new_today=new, stocks=stocks, removed=removed), open(LIST, "w"))
+                   stocks_scanned=scanned, new_today=new, stocks=stocks, removed=removed,
+                   diag=dict(crossed_any_candle_by_month=dict(sorted(diag_any.items())), crossed_green_by_month=dict(sorted(diag_green.items())), above_now=above_now)), open(LIST, "w"))
     print(f"{new} new monthly 20/50 crossovers (green candle) for {latest_month}, {len(stocks)} stocks kept in the list, {scanned} scanned (data up to {last_date})")
 
 
