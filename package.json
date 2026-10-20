@@ -1,0 +1,7 @@
+{
+  "name": "squeeze-setup",
+  "version": "1.0.0",
+  "dependencies": {
+    "otpauth": "^9.2.2"
+  }
+}
