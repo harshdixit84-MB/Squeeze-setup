@@ -18,6 +18,12 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r backtest/requirements.txt
+      - name: Restore saved prices (from the last Daily scan, read only)
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: prices-v1-none
+          restore-keys: prices-v1-
       - run: python backtest/save_squeeze_list.py
       - name: Save into the repo
         run: |

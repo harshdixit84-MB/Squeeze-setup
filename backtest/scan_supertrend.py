@@ -68,8 +68,22 @@ def monthly(d, now):
     return m[m.index < pd.Period(now, "M")]               # the month that is still running is not a candle yet
 
 
+def last_close(sym):
+    """(last close, its date) from the saved Angel One prices in ./data/, or None when there is no file for the stock."""
+    path = f"{DATA_DIR}/{sym.replace('&', '_')}.csv"
+    if not os.path.exists(path):
+        return None
+    try:
+        d = pd.read_csv(path, usecols=["date", "close"]).dropna().tail(1)
+        return round(float(d["close"].iloc[0]), 2), str(d["date"].iloc[0])[:10]
+    except Exception:
+        return None
+
+
 def save_squeeze_page():
-    """Writes the whole Squeeze tab (every row, any series) to site/data/squeeze_list.json for the "Squeeze List" page. Keeps the old file if the sheet can't be read."""
+    """Writes the whole Squeeze tab (every row, any series) to site/data/squeeze_list.json for the "Squeeze List" page. Keeps the old file if the sheet can't be read.
+    Each row also gets the last close ("price") and its date ("price_date") from ./data/; when a stock has no price file in this run
+    (e.g. the morning refresh with no saved prices) the price already in the old file is kept instead of being wiped."""
     try:
         r = requests.get(SHEET_CSV, timeout=60)
         r.raise_for_status()
@@ -77,9 +91,21 @@ def save_squeeze_page():
         rows = [dict(symbol=str(x["Symbol"]).strip(), tv=str(x["Symbol"]).strip().replace("&", "_").replace("-", "_"),
                      company=str(x.get("Company Name", "")).strip(), industry=str(x.get("Industry", "")).strip(), series=str(x.get("Series", "")).strip())
                 for _, x in df.iterrows()]
+        try:
+            old = {s["symbol"]: s for s in json.load(open(f"{OUT_DIR}/squeeze_list.json")).get("stocks", [])}
+        except Exception:
+            old = {}
+        for row in rows:
+            p = last_close(row["symbol"])
+            if p is None and old.get(row["symbol"], {}).get("price") is not None:
+                p = (old[row["symbol"]]["price"], old[row["symbol"]].get("price_date"))
+            if p is not None:
+                row["price"], row["price_date"] = p
         if len(rows) > 50:
-            json.dump(dict(updated=datetime.now(IST).strftime("%d %b %Y %H:%M"), count=len(rows), stocks=rows), open(f"{OUT_DIR}/squeeze_list.json", "w"))
-            print(f"Squeeze list page: {len(rows)} stocks")
+            dates = [x["price_date"] for x in rows if x.get("price_date")]
+            json.dump(dict(updated=datetime.now(IST).strftime("%d %b %Y %H:%M"), count=len(rows), price_date=max(dates) if dates else None, stocks=rows),
+                      open(f"{OUT_DIR}/squeeze_list.json", "w"))
+            print(f"Squeeze list page: {len(rows)} stocks, {len(dates)} with a price")
     except Exception as ex:
         print(f"::warning::Could not refresh the Squeeze list page ({ex})")
 
