@@ -1,0 +1,781 @@
+{
+ "SRF": {
+  "W": {
+   "http": 200,
+   "seconds": 4.9,
+   "bars": 584,
+   "from": "2015-08-12",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": {
+    "totalTrades": 2,
+    "winPct": 100,
+    "avgPlPct": 30,
+    "bestPct": 30,
+    "worstPct": 30
+   },
+   "trades": 2,
+   "firstTrades": [
+    {
+     "trade": 1,
+     "entryDate": "2017-10-16",
+     "entryPrice": 345.4,
+     "exitDate": "2018-04-26",
+     "exitPrice": 449.02,
+     "reason": "Target +30%",
+     "peakGainPct": 36.2,
+     "plPct": 30,
+     "plRs": 103.62,
+     "duration": 27,
+     "durationUnit": "weeks",
+     "reached70": "Yes",
+     "barsTo70": 83
+    },
+    {
+     "trade": 2,
+     "entryDate": "2023-03-27",
+     "entryPrice": 2380.1,
+     "exitDate": "2025-05-12",
+     "exitPrice": 3094.13,
+     "reason": "Target +30%",
+     "peakGainPct": 30.2,
+     "plPct": 30,
+     "plRs": 714.03,
+     "duration": 111,
+     "durationUnit": "weeks",
+     "reached70": "Running",
+     "barsTo70": null
+    }
+   ],
+   "lastTrade": {
+    "trade": 2,
+    "entryDate": "2023-03-27",
+    "entryPrice": 2380.1,
+    "exitDate": "2025-05-12",
+    "exitPrice": 3094.13,
+    "reason": "Target +30%",
+    "peakGainPct": 30.2,
+    "plPct": 30,
+    "plRs": 714.03,
+    "duration": 111,
+    "durationUnit": "weeks",
+    "reached70": "Running",
+    "barsTo70": null
+   }
+  },
+  "M": {
+   "http": 200,
+   "seconds": 3.7,
+   "bars": 180,
+   "from": "2011-10-25",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": null,
+   "trades": 0,
+   "firstTrades": []
+  }
+ },
+ "FEDERALBNK": {
+  "W": {
+   "http": 200,
+   "seconds": 8.4,
+   "bars": 584,
+   "from": "2015-08-12",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": {
+    "totalTrades": 3,
+    "winPct": 33.3,
+    "avgPlPct": -3.3,
+    "bestPct": 30,
+    "worstPct": -20
+   },
+   "trades": 3,
+   "firstTrades": [
+    {
+     "trade": 1,
+     "entryDate": "2019-04-08",
+     "entryPrice": 99.45,
+     "exitDate": "2019-08-23",
+     "exitPrice": 79.56,
+     "reason": "Stop -20%",
+     "peakGainPct": 11,
+     "plPct": -20,
+     "plRs": -19.89,
+     "duration": 19,
+     "durationUnit": "weeks",
+     "reached70": "-",
+     "barsTo70": null
+    },
+    {
+     "trade": 2,
+     "entryDate": "2019-09-30",
+     "entryPrice": 93.8,
+     "exitDate": "2020-03-09",
+     "exitPrice": 75.04,
+     "reason": "Stop -20%",
+     "peakGainPct": 3.4,
+     "plPct": -20,
+     "plRs": -18.76,
+     "duration": 23,
+     "durationUnit": "weeks",
+     "reached70": "-",
+     "barsTo70": null
+    },
+    {
+     "trade": 3,
+     "entryDate": "2021-01-25",
+     "entryPrice": 74.05,
+     "exitDate": "2021-10-18",
+     "exitPrice": 96.27,
+     "reason": "Target +30%",
+     "peakGainPct": 30.3,
+     "plPct": 30,
+     "plRs": 22.22,
+     "duration": 38,
+     "durationUnit": "weeks",
+     "reached70": "Yes",
+     "barsTo70": 84
+    }
+   ],
+   "lastTrade": {
+    "trade": 3,
+    "entryDate": "2021-01-25",
+    "entryPrice": 74.05,
+    "exitDate": "2021-10-18",
+    "exitPrice": 96.27,
+    "reason": "Target +30%",
+    "peakGainPct": 30.3,
+    "plPct": 30,
+    "plRs": 22.22,
+    "duration": 38,
+    "durationUnit": "weeks",
+    "reached70": "Yes",
+    "barsTo70": 84
+   }
+  },
+  "M": {
+   "http": 200,
+   "seconds": 6.3,
+   "bars": 180,
+   "from": "2011-10-25",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": {
+    "totalTrades": 1,
+    "winPct": 100,
+    "avgPlPct": 30,
+    "bestPct": 30,
+    "worstPct": 30
+   },
+   "trades": 1,
+   "firstTrades": [
+    {
+     "trade": 1,
+     "entryDate": "2021-11-01",
+     "entryPrice": 98,
+     "exitDate": "2022-09-05",
+     "exitPrice": 127.4,
+     "reason": "Target +30%",
+     "peakGainPct": 32.4,
+     "plPct": 30,
+     "plRs": 29.4,
+     "duration": 10,
+     "durationUnit": "months",
+     "reached70": "Yes",
+     "barsTo70": 30
+    }
+   ],
+   "lastTrade": {
+    "trade": 1,
+    "entryDate": "2021-11-01",
+    "entryPrice": 98,
+    "exitDate": "2022-09-05",
+    "exitPrice": 127.4,
+    "reason": "Target +30%",
+    "peakGainPct": 32.4,
+    "plPct": 30,
+    "plRs": 29.4,
+    "duration": 10,
+    "durationUnit": "months",
+    "reached70": "Yes",
+    "barsTo70": 30
+   }
+  }
+ },
+ "HEXT": {
+  "W": {
+   "http": 200,
+   "seconds": 6.7,
+   "bars": 87,
+   "from": "2025-02-19",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": null,
+   "trades": 0,
+   "firstTrades": []
+  },
+  "M": {
+   "http": 200,
+   "seconds": 2.7,
+   "bars": 20,
+   "from": "2025-02-19",
+   "to": "2026-10-19",
+   "note": "Not enough history for the 20/50 EMA (needs 50+ months)",
+   "adjustments": [],
+   "summary": null,
+   "trades": 0,
+   "firstTrades": []
+  }
+ },
+ "M&MFIN": {
+  "W": {
+   "http": 200,
+   "seconds": 4.2,
+   "bars": 584,
+   "from": "2015-08-12",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": {
+    "totalTrades": 6,
+    "winPct": 50,
+    "avgPlPct": 5,
+    "bestPct": 30,
+    "worstPct": -20
+   },
+   "trades": 6,
+   "firstTrades": [
+    {
+     "trade": 1,
+     "entryDate": "2017-03-27",
+     "entryPrice": 190.54,
+     "exitDate": "2017-08-04",
+     "exitPrice": 247.7,
+     "reason": "Target +30%",
+     "peakGainPct": 31.5,
+     "plPct": 30,
+     "plRs": 57.16,
+     "duration": 18,
+     "durationUnit": "weeks",
+     "reached70": "No (SL hit)",
+     "barsTo70": null
+    },
+    {
+     "trade": 2,
+     "entryDate": "2019-01-07",
+     "entryPrice": 276.74,
+     "exitDate": "2019-02-13",
+     "exitPrice": 221.39,
+     "reason": "Stop -20%",
+     "peakGainPct": 0.3,
+     "plPct": -20,
+     "plRs": -55.35,
+     "duration": 5,
+     "durationUnit": "weeks",
+     "reached70": "-",
+     "barsTo70": null
+    },
+    {
+     "trade": 3,
+     "entryDate": "2021-01-11",
+     "entryPrice": 185.84,
+     "exitDate": "2021-01-29",
+     "exitPrice": 148.67,
+     "reason": "Stop -20%",
+     "peakGainPct": 4,
+     "plPct": -20,
+     "plRs": -37.17,
+     "duration": 2,
+     "durationUnit": "weeks",
+     "reached70": "-",
+     "barsTo70": null
+    },
+    {
+     "trade": 4,
+     "entryDate": "2021-10-04",
+     "entryPrice": 182.92,
+     "exitDate": "2021-12-17",
+     "exitPrice": 146.34,
+     "reason": "Stop -20%",
+     "peakGainPct": 9.8,
+     "plPct": -20,
+     "plRs": -36.58,
+     "duration": 10,
+     "durationUnit": "weeks",
+     "reached70": "-",
+     "barsTo70": null
+    },
+    {
+     "trade": 5,
+     "entryDate": "2022-05-02",
+     "entryPrice": 173.48,
+     "exitDate": "2022-09-15",
+     "exitPrice": 225.52,
+     "reason": "Target +30%",
+     "peakGainPct": 31.9,
+     "plPct": 30,
+     "plRs": 52.04,
+     "duration": 19,
+     "durationUnit": "weeks",
+     "reached70": "Yes",
+     "barsTo70": 57
+    }
+   ],
+   "lastTrade": {
+    "trade": 6,
+    "entryDate": "2025-10-13",
+    "entryPrice": 279.1,
+    "exitDate": "2025-11-25",
+    "exitPrice": 362.83,
+    "reason": "Target +30%",
+    "peakGainPct": 30.4,
+    "plPct": 30,
+    "plRs": 83.73,
+    "duration": 6,
+    "durationUnit": "weeks",
+    "reached70": "Running",
+    "barsTo70": null
+   }
+  },
+  "M": {
+   "http": 200,
+   "seconds": 4.3,
+   "bars": 180,
+   "from": "2011-10-25",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": {
+    "totalTrades": 1,
+    "winPct": 100,
+    "avgPlPct": 30,
+    "bestPct": 30,
+    "worstPct": 30
+   },
+   "trades": 1,
+   "firstTrades": [
+    {
+     "trade": 1,
+     "entryDate": "2023-01-02",
+     "entryPrice": 228.7,
+     "exitDate": "2023-06-16",
+     "exitPrice": 297.31,
+     "reason": "Target +30%",
+     "peakGainPct": 30.1,
+     "plPct": 30,
+     "plRs": 68.61,
+     "duration": 5,
+     "durationUnit": "months",
+     "reached70": "Yes",
+     "barsTo70": 35
+    }
+   ],
+   "lastTrade": {
+    "trade": 1,
+    "entryDate": "2023-01-02",
+    "entryPrice": 228.7,
+    "exitDate": "2023-06-16",
+    "exitPrice": 297.31,
+    "reason": "Target +30%",
+    "peakGainPct": 30.1,
+    "plPct": 30,
+    "plRs": 68.61,
+    "duration": 5,
+    "durationUnit": "months",
+    "reached70": "Yes",
+    "barsTo70": 35
+   }
+  }
+ },
+ "GVT&D": {
+  "W": {
+   "http": 200,
+   "seconds": 3.1,
+   "bars": 584,
+   "from": "2015-08-12",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": {
+    "totalTrades": 4,
+    "winPct": 25,
+    "avgPlPct": -7.6,
+    "bestPct": 30,
+    "worstPct": -20.3
+   },
+   "trades": 4,
+   "firstTrades": [
+    {
+     "trade": 1,
+     "entryDate": "2017-08-14",
+     "entryPrice": 390,
+     "exitDate": "2018-05-29",
+     "exitPrice": 312,
+     "reason": "Stop -20%",
+     "peakGainPct": 21.6,
+     "plPct": -20,
+     "plRs": -78,
+     "duration": 41,
+     "durationUnit": "weeks",
+     "reached70": "-",
+     "barsTo70": null
+    },
+    {
+     "trade": 2,
+     "entryDate": "2021-03-08",
+     "entryPrice": 137.95,
+     "exitDate": "2021-04-19",
+     "exitPrice": 110,
+     "reason": "Stop -20% (gap)",
+     "peakGainPct": 4.2,
+     "plPct": -20.3,
+     "plRs": -27.95,
+     "duration": 6,
+     "durationUnit": "weeks",
+     "reached70": "-",
+     "barsTo70": null
+    },
+    {
+     "trade": 3,
+     "entryDate": "2022-09-12",
+     "entryPrice": 134,
+     "exitDate": "2022-12-23",
+     "exitPrice": 107.2,
+     "reason": "Stop -20%",
+     "peakGainPct": 7.1,
+     "plPct": -20,
+     "plRs": -26.8,
+     "duration": 14,
+     "durationUnit": "weeks",
+     "reached70": "-",
+     "barsTo70": null
+    },
+    {
+     "trade": 4,
+     "entryDate": "2023-04-17",
+     "entryPrice": 137.85,
+     "exitDate": "2023-04-28",
+     "exitPrice": 179.21,
+     "reason": "Target +30%",
+     "peakGainPct": 34.2,
+     "plPct": 30,
+     "plRs": 41.36,
+     "duration": 1,
+     "durationUnit": "weeks",
+     "reached70": "Yes",
+     "barsTo70": 4
+    }
+   ],
+   "lastTrade": {
+    "trade": 4,
+    "entryDate": "2023-04-17",
+    "entryPrice": 137.85,
+    "exitDate": "2023-04-28",
+    "exitPrice": 179.21,
+    "reason": "Target +30%",
+    "peakGainPct": 34.2,
+    "plPct": 30,
+    "plRs": 41.36,
+    "duration": 1,
+    "durationUnit": "weeks",
+    "reached70": "Yes",
+    "barsTo70": 4
+   }
+  },
+  "M": {
+   "http": 200,
+   "seconds": 2.8,
+   "bars": 180,
+   "from": "2011-10-25",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": {
+    "totalTrades": 1,
+    "winPct": 0,
+    "avgPlPct": -20,
+    "bestPct": -20,
+    "worstPct": -20
+   },
+   "trades": 1,
+   "firstTrades": [
+    {
+     "trade": 1,
+     "entryDate": "2023-10-03",
+     "entryPrice": 442.65,
+     "exitDate": "2023-10-26",
+     "exitPrice": 354.12,
+     "reason": "Stop -20%",
+     "peakGainPct": 1.5,
+     "plPct": -20,
+     "plRs": -88.53,
+     "duration": 0,
+     "durationUnit": "months",
+     "reached70": "-",
+     "barsTo70": null
+    }
+   ],
+   "lastTrade": {
+    "trade": 1,
+    "entryDate": "2023-10-03",
+    "entryPrice": 442.65,
+    "exitDate": "2023-10-26",
+    "exitPrice": 354.12,
+    "reason": "Stop -20%",
+    "peakGainPct": 1.5,
+    "plPct": -20,
+    "plRs": -88.53,
+    "duration": 0,
+    "durationUnit": "months",
+    "reached70": "-",
+    "barsTo70": null
+   }
+  }
+ },
+ "ATUL": {
+  "W": {
+   "http": 200,
+   "seconds": 6.6,
+   "bars": 584,
+   "from": "2015-08-12",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": {
+    "totalTrades": 4,
+    "winPct": 0,
+    "avgPlPct": -20,
+    "bestPct": -20,
+    "worstPct": -20
+   },
+   "trades": 4,
+   "firstTrades": [
+    {
+     "trade": 1,
+     "entryDate": "2022-08-16",
+     "entryPrice": 9285,
+     "exitDate": "2023-01-20",
+     "exitPrice": 7428,
+     "reason": "Stop -20%",
+     "peakGainPct": 5.7,
+     "plPct": -20,
+     "plRs": -1857,
+     "duration": 22,
+     "durationUnit": "weeks",
+     "reached70": "-",
+     "barsTo70": null
+    },
+    {
+     "trade": 2,
+     "entryDate": "2024-08-12",
+     "entryPrice": 8060,
+     "exitDate": "2025-01-27",
+     "exitPrice": 6448,
+     "reason": "Stop -20%",
+     "peakGainPct": 1.5,
+     "plPct": -20,
+     "plRs": -1612,
+     "duration": 24,
+     "durationUnit": "weeks",
+     "reached70": "-",
+     "barsTo70": null
+    },
+    {
+     "trade": 3,
+     "entryDate": "2025-06-30",
+     "entryPrice": 7415,
+     "exitDate": "2025-09-29",
+     "exitPrice": 5932,
+     "reason": "Stop -20%",
+     "peakGainPct": 5,
+     "plPct": -20,
+     "plRs": -1483,
+     "duration": 13,
+     "durationUnit": "weeks",
+     "reached70": "-",
+     "barsTo70": null
+    },
+    {
+     "trade": 4,
+     "entryDate": "2026-05-04",
+     "entryPrice": 6890,
+     "exitDate": "2026-10-19",
+     "exitPrice": 6082,
+     "reason": "Open (marked at last close)",
+     "peakGainPct": 4.2,
+     "plPct": -11.7,
+     "plRs": -808,
+     "duration": 24,
+     "durationUnit": "weeks",
+     "reached70": "-",
+     "barsTo70": null
+    }
+   ],
+   "lastTrade": {
+    "trade": 4,
+    "entryDate": "2026-05-04",
+    "entryPrice": 6890,
+    "exitDate": "2026-10-19",
+    "exitPrice": 6082,
+    "reason": "Open (marked at last close)",
+    "peakGainPct": 4.2,
+    "plPct": -11.7,
+    "plRs": -808,
+    "duration": 24,
+    "durationUnit": "weeks",
+    "reached70": "-",
+    "barsTo70": null
+   }
+  },
+  "M": {
+   "http": 200,
+   "seconds": 3.1,
+   "bars": 180,
+   "from": "2011-10-25",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": null,
+   "trades": 0,
+   "firstTrades": []
+  }
+ },
+ "HFCL": {
+  "W": {
+   "http": 200,
+   "seconds": 6.5,
+   "bars": 584,
+   "from": "2015-08-12",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": {
+    "totalTrades": 4,
+    "winPct": 100,
+    "avgPlPct": 30,
+    "bestPct": 30,
+    "worstPct": 30
+   },
+   "trades": 4,
+   "firstTrades": [
+    {
+     "trade": 1,
+     "entryDate": "2017-08-07",
+     "entryPrice": 17.1,
+     "exitDate": "2017-09-05",
+     "exitPrice": 22.23,
+     "reason": "Target +30%",
+     "peakGainPct": 30.4,
+     "plPct": 30,
+     "plRs": 5.13,
+     "duration": 4,
+     "durationUnit": "weeks",
+     "reached70": "Yes",
+     "barsTo70": 4
+    },
+    {
+     "trade": 2,
+     "entryDate": "2020-11-02",
+     "entryPrice": 17.35,
+     "exitDate": "2020-12-02",
+     "exitPrice": 22.56,
+     "reason": "Target +30%",
+     "peakGainPct": 34.9,
+     "plPct": 30,
+     "plRs": 5.21,
+     "duration": 4,
+     "durationUnit": "weeks",
+     "reached70": "Yes",
+     "barsTo70": 9
+    },
+    {
+     "trade": 3,
+     "entryDate": "2023-09-18",
+     "entryPrice": 75,
+     "exitDate": "2024-01-20",
+     "exitPrice": 97.5,
+     "reason": "Target +30%",
+     "peakGainPct": 35.1,
+     "plPct": 30,
+     "plRs": 22.5,
+     "duration": 17,
+     "durationUnit": "weeks",
+     "reached70": "Yes",
+     "barsTo70": 39
+    },
+    {
+     "trade": 4,
+     "entryDate": "2026-05-04",
+     "entryPrice": 122.35,
+     "exitDate": "2026-05-25",
+     "exitPrice": 159.06,
+     "reason": "Target +30%",
+     "peakGainPct": 33.2,
+     "plPct": 30,
+     "plRs": 36.71,
+     "duration": 3,
+     "durationUnit": "weeks",
+     "reached70": "Yes",
+     "barsTo70": 4
+    }
+   ],
+   "lastTrade": {
+    "trade": 4,
+    "entryDate": "2026-05-04",
+    "entryPrice": 122.35,
+    "exitDate": "2026-05-25",
+    "exitPrice": 159.06,
+    "reason": "Target +30%",
+    "peakGainPct": 33.2,
+    "plPct": 30,
+    "plRs": 36.71,
+    "duration": 3,
+    "durationUnit": "weeks",
+    "reached70": "Yes",
+    "barsTo70": 4
+   }
+  },
+  "M": {
+   "http": 200,
+   "seconds": 3,
+   "bars": 180,
+   "from": "2011-10-25",
+   "to": "2026-10-19",
+   "adjustments": [],
+   "summary": {
+    "totalTrades": 1,
+    "winPct": 0,
+    "avgPlPct": -20,
+    "bestPct": -20,
+    "worstPct": -20
+   },
+   "trades": 1,
+   "firstTrades": [
+    {
+     "trade": 1,
+     "entryDate": "2021-02-01",
+     "entryPrice": 29.15,
+     "exitDate": "2021-04-12",
+     "exitPrice": 23.32,
+     "reason": "Stop -20%",
+     "peakGainPct": 9.3,
+     "plPct": -20,
+     "plRs": -5.83,
+     "duration": 2,
+     "durationUnit": "months",
+     "reached70": "-",
+     "barsTo70": null
+    }
+   ],
+   "lastTrade": {
+    "trade": 1,
+    "entryDate": "2021-02-01",
+    "entryPrice": 29.15,
+    "exitDate": "2021-04-12",
+    "exitPrice": 23.32,
+    "reason": "Stop -20%",
+    "peakGainPct": 9.3,
+    "plPct": -20,
+    "plRs": -5.83,
+    "duration": 2,
+    "durationUnit": "months",
+    "reached70": "-",
+    "barsTo70": null
+   }
+  }
+ }
+}
