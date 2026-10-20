@@ -1,0 +1,7 @@
+{
+  "framework": null,
+  "outputDirectory": "site",
+  "functions": {
+    "api/backtest.js": { "maxDuration": 60 }
+  }
+}

@@ -283,6 +283,7 @@ Promise.all([fetch('data/supertrend_list.json').then(r=>{if(!r.ok)throw 0;return
 <h1>Squeeze List</h1>
 <p class="n" id="qm">Loading...</p>
 <p class="n">Every stock in the Squeeze tab of your Google Sheet. Click a stock name to open its chart in TradingView. The list refreshes every morning and with each Daily scan.</p>
+<p class="n"><b>Calculate (weekly backtest, last 10 years, one stock at a time, prices from Angel One):</b> the 20 EMA closes above the 50 EMA on a closed weekly candle, the trade starts at the next week's open and ends at +30% (target) or -20% from entry (stop), whichever the daily candles show first. After a +30% exit it also tells whether price later reached +70% (trail target hit) or fell to -20% first (stoploss hit). The next trade needs a fresh crossover after the previous trade has closed. If target and stop fall inside one daily candle, the stop is assumed first.</p>
 <input id="qq" placeholder="Search stock / company / industry" style="width:min(320px,100%)"> <select id="qi"><option value="">All industries</option></select>
 <div class="w"><table id="qt"></table></div>
 </div>
@@ -290,13 +291,43 @@ Promise.all([fetch('data/supertrend_list.json').then(r=>{if(!r.ok)throw 0;return
 (()=>{
 const $=i=>document.getElementById(i);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let R=[];
+let R=[];const res={};let busy=null;   // res[symbol] = {loading} | {error} | {data, show}; busy = the one symbol being calculated
+const sg=n=>(n>0?'+':'')+n,cl=n=>n>0?'g':n<0?'r':'';
+function detail(d){
+ const u=d.tf=='M'?'months':'weeks';let h='';
+ if(d.note)h+=`<p class="n">${esc(d.note)}</p>`;
+ if(d.adjustments&&d.adjustments.length)h+=`<p class="n">Prices adjusted for ${d.adjustments.length} split/bonus-like gap(s): ${d.adjustments.map(a=>esc(a.date)+' ('+a.overnightChangePct+'%)').join(', ')}. Older prices below are scaled, so they differ from the prices of that time.</p>`;
+ const s=d.summary;
+ if(s)h+=`<p><b>Trades:</b> ${s.totalTrades} &nbsp; <b>Win %:</b> ${s.winPct} &nbsp; <b>Avg P/L:</b> <span class="${cl(s.avgPlPct)}">${sg(s.avgPlPct)}%</span> &nbsp; <b>Best:</b> <span class="g">${sg(s.bestPct)}%</span> &nbsp; <b>Worst:</b> <span class="r">${s.worstPct}%</span> &nbsp; <small style="opacity:.75">(a trade still open is not counted; price data ${esc(d.firstDate)} to ${esc(d.lastDate)})</small></p>`;
+ if(!d.trades.length)h+='<p class="n">No setups in this period.</p>';
+ else h+='<div class="w"><table class="sm"><tr>'+['Trade','Entry date','Entry','Exit date','Exit','Exit reason','Peak gain %','P/L %','P/L Rs (1 share)',`Duration (${u})`,'Reached +70%?',`${u} to +70%`].map(c=>`<th>${c}</th>`).join('')+'</tr>'+
+  d.trades.map(t=>`<tr><td>${t.trade}</td><td>${esc(t.entryDate)}</td><td>${t.entryPrice}</td><td>${esc(t.exitDate)}</td><td>${t.exitPrice}</td><td>${esc(t.reason)}</td><td>${t.peakGainPct}</td><td class="${cl(t.plPct)}">${sg(t.plPct)}</td><td class="${cl(t.plRs)}">${sg(t.plRs)}</td><td>${t.duration}</td><td>${esc(t.reached70)}</td><td>${t.barsTo70==null?'-':t.barsTo70}</td></tr>`).join('')+'</table></div>';
+ return h+'<p><a href="#" class="hd">Hide</a></p>';
+}
 function draw(){
  const q=$('qq').value.toUpperCase(),ind=$('qi').value,f=R.filter(r=>(!ind||r.industry==ind)&&(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q));
- $('qt').innerHTML='<tr>'+['#','Stock','Company','Industry','Series'].map(c=>`<th>${c}</th>`).join('')+'</tr>'+
- (f.map((r,i)=>`<tr><td>${i+1}</td><td><a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+r.tv)}" target="_blank" rel="noopener">${esc(r.symbol)}</a></td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td><td>${esc(r.series)}</td></tr>`).join('')||'<tr><td colspan="5">No stock matches.</td></tr>');
+ $('qt').innerHTML='<tr>'+['#','Stock','Company','Industry','Series','Weekly 20/50 backtest'].map(c=>`<th>${c}</th>`).join('')+'</tr>'+
+ (f.map((r,i)=>{const x=res[r.symbol]||{},st=x.loading?'Running... (can take 10-30 s)':x.error?`<span class="r">${esc(x.error)}</span>`:x.data?`Done - ${x.data.trades.length} trades${x.show?'':' <a href="#" class="sh">show</a>'}`:'';
+  return `<tr><td>${i+1}</td><td><a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+r.tv)}" target="_blank" rel="noopener">${esc(r.symbol)}</a></td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td><td>${esc(r.series)}</td><td><button class="cb" data-s="${esc(r.symbol)}"${busy?' disabled':''}>${x.data?'Recalculate':'Calculate'}</button> <small>${st}</small></td></tr>`+
+  (x.data&&x.show?`<tr class="dt" data-s="${esc(r.symbol)}"><td colspan="6">${detail(x.data)}</td></tr>`:'')}).join('')||'<tr><td colspan="6">No stock matches.</td></tr>');
  $('qm').textContent=`${f.length} of ${R.length} stocks shown.`;
 }
+async function calc(s){
+ if(busy)return;busy=s;res[s]={loading:true};draw();
+ try{
+  const r=await fetch('/api/backtest?symbol='+encodeURIComponent(s)+'&tf=W&years=10');
+  let d;try{d=await r.json()}catch(e){throw new Error('API not reachable (HTTP '+r.status+') - Vercel setup problem')}
+  if(!r.ok||d.error)throw new Error(d.error||'HTTP '+r.status);
+  res[s]={data:d,show:true};
+ }catch(e){res[s]={error:e.message}}
+ busy=null;draw();
+}
+$('qt').onclick=e=>{
+ const b=e.target.closest('button.cb');if(b)return calc(b.dataset.s);
+ const h=e.target.closest('a.hd'),w=e.target.closest('a.sh');
+ if(h){e.preventDefault();res[h.closest('tr.dt').dataset.s].show=false;draw()}
+ if(w){e.preventDefault();res[w.closest('tr').querySelector('button.cb').dataset.s].show=true;draw()}
+};
 $('qq').oninput=$('qi').onchange=draw;
 fetch('data/squeeze_list.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(k=>{R=k.stocks;
  [...new Set(R.map(r=>r.industry).filter(Boolean))].sort().forEach(i=>{const o=document.createElement('option');o.value=o.textContent=i;$('qi').appendChild(o)});draw()})

@@ -1,7 +1,16 @@
+// GET /api/backtest?symbol=TCS&tf=W&years=10
+// Logs in to Angel One, downloads daily candles for ONE stock, runs the 20/50 EMA backtest (see _engine.js).
+// Needs 4 environment variables in Vercel: ANGEL_API_KEY, ANGEL_CLIENT_CODE (or ANGEL_CLIENT_ID), ANGEL_PIN, ANGEL_TOTP_SECRET.
 const OTPAuth = require("otpauth");
+const { istNow, fixSplits, runBacktest, summarize, WARMUP } = require("./_engine");
 
 const BASE = "https://apiconnect.angelbroking.com";
-const STOP_PCT = 0.2, TARGET_PCT = 0.3, TRAIL_PCT = 0.7, WARMUP = 50;
+const sleep = (n) => new Promise((r) => setTimeout(r, n));
+
+function need(name, ...alts) {
+  for (const n of [name, ...alts]) if (process.env[n]) return process.env[n];
+  throw new Error(`Vercel environment variable ${[name, ...alts].join(" / ")} is missing`);
+}
 
 function hdrs(jwt) {
   const h = {
@@ -12,186 +21,68 @@ function hdrs(jwt) {
     "X-ClientLocalIP": "127.0.0.1",
     "X-ClientPublicIP": "127.0.0.1",
     "X-MACAddress": "00:00:00:00:00:00",
-    "X-PrivateKey": process.env.ANGEL_API_KEY,
+    "X-PrivateKey": need("ANGEL_API_KEY"),
   };
   if (jwt) h.Authorization = `Bearer ${jwt}`;
   return h;
 }
 
-async function post(path, body, jwt) {
-  const r = await fetch(BASE + path, { method: "POST", headers: hdrs(jwt), body: JSON.stringify(body) });
-  return r.json();
+// Angel limits requests per second; retry a few times before giving up
+async function post(path, body, jwt, tries = 4) {
+  let last = null;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const r = await fetch(BASE + path, { method: "POST", headers: hdrs(jwt), body: JSON.stringify(body) });
+    let j = null;
+    try { j = await r.json(); } catch (e) { j = { status: false, message: "Angel sent an unreadable reply (HTTP " + r.status + ")" }; }
+    if (j && j.status !== false) return j;
+    last = j;
+    await sleep(1200 * (attempt + 1));
+  }
+  throw new Error("Angel One: " + ((last && last.message) || "request failed") + " [" + path.split("/").pop() + "]");
 }
 
 async function angelLogin() {
   const totp = new OTPAuth.TOTP({
-    secret: OTPAuth.Secret.fromBase32(process.env.ANGEL_TOTP_SECRET),
+    secret: OTPAuth.Secret.fromBase32(need("ANGEL_TOTP_SECRET")),
     digits: 6,
     period: 30,
   }).generate();
   const res = await post("/rest/auth/angelbroking/user/v1/loginByPassword", {
-    clientcode: process.env.ANGEL_CLIENT_CODE,
-    password: process.env.ANGEL_PIN,
+    clientcode: need("ANGEL_CLIENT_CODE", "ANGEL_CLIENT_ID"),
+    password: need("ANGEL_PIN"),
     totp,
-  });
-  if (!res.status) throw new Error("Angel login failed: " + res.message);
+  }, null, 1);                                         // no retry on login: repeated wrong attempts can lock the account
+  if (!res.data || !res.data.jwtToken) throw new Error("Angel login failed: " + res.message);
   return res.data.jwtToken;
 }
 
 async function findToken(jwt, symbol) {
-  const res = await post("/rest/secure/angelbroking/order/v1/searchScrip",
-    { exchange: "NSE", searchscrip: symbol }, jwt);
+  const res = await post("/rest/secure/angelbroking/order/v1/searchScrip", { exchange: "NSE", searchscrip: symbol }, jwt);
   const list = res.data || [];
-  const hit = list.find((x) => x.tradingsymbol === `${symbol}-EQ`) ||
-              list.find((x) => x.tradingsymbol === `${symbol}-BE`);
-  if (!hit) throw new Error("Symbol not found on Angel: " + symbol);
+  const hit = list.find((x) => x.tradingsymbol === `${symbol}-EQ`) || list.find((x) => x.tradingsymbol === `${symbol}-BE`);
+  if (!hit) throw new Error("Symbol not found on Angel One: " + symbol);
   return hit.symboltoken;
 }
 
 const pad = (n) => String(n).padStart(2, "0");
-const fmt = (d) =>
-  `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+const fmt = (d) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 
 async function fetchDaily(jwt, token, years) {
-  const end = new Date();
-  const start = new Date(end.getTime() - years * 365 * 86400000);
-  const WINDOW = 1900 * 86400000; // Angel allows max 2000 days per daily request
+  const end = new Date(), start = new Date(end.getTime() - years * 365 * 86400000);
+  const WINDOW = 1900 * 86400000;                      // Angel allows at most 2000 days per daily request
   const rows = new Map();
   for (let from = start.getTime(); from < end.getTime(); from += WINDOW) {
     const to = Math.min(from + WINDOW - 86400000, end.getTime());
     const res = await post("/rest/secure/angelbroking/historical/v1/getCandleData", {
-      exchange: "NSE",
-      symboltoken: token,
-      interval: "ONE_DAY",
-      fromdate: fmt(new Date(from)),
-      todate: fmt(new Date(to)),
+      exchange: "NSE", symboltoken: token, interval: "ONE_DAY", fromdate: fmt(new Date(from)), todate: fmt(new Date(to)),
     }, jwt);
     for (const c of res.data || []) {
+      if (!(c[1] > 0 && c[2] > 0 && c[3] > 0 && c[4] > 0)) continue;
       rows.set(c[0].slice(0, 10), { date: c[0].slice(0, 10), open: c[1], high: c[2], low: c[3], close: c[4] });
     }
+    await sleep(400);
   }
   return [...rows.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
-}
-
-function periodKey(dateStr, tf) {
-  if (tf === "M") return dateStr.slice(0, 7);
-  const d = new Date(dateStr + "T00:00:00Z");
-  const diff = (d.getUTCDay() + 6) % 7; // back to Monday
-  return new Date(d.getTime() - diff * 86400000).toISOString().slice(0, 10);
-}
-
-function aggregate(daily, tf) {
-  const bars = [];
-  let cur = null, curKey = null;
-  for (const d of daily) {
-    const k = periodKey(d.date, tf);
-    if (k !== curKey) {
-      if (cur) bars.push(cur);
-      cur = { date: d.date, open: d.open, high: d.high, low: d.low, close: d.close };
-      curKey = k;
-    } else {
-      cur.high = Math.max(cur.high, d.high);
-      cur.low = Math.min(cur.low, d.low);
-      cur.close = d.close;
-    }
-  }
-  if (cur) {
-    // drop the still-running (incomplete) period
-    const today = new Date().toISOString().slice(0, 10);
-    const dow = new Date().getUTCDay();
-    const running = tf === "M"
-      ? curKey === today.slice(0, 7)
-      : curKey === periodKey(today, "W") && dow >= 1 && dow <= 5;
-    if (!running) bars.push(cur);
-  }
-  return bars;
-}
-
-function ema(values, span) {
-  const a = 2 / (span + 1);
-  const out = [values[0]];
-  for (let i = 1; i < values.length; i++) out.push(a * values[i] + (1 - a) * out[i - 1]);
-  return out;
-}
-
-function whatIf70(bars, exitIdx, entryPrice) {
-  const stop = entryPrice * (1 - STOP_PCT), goal = entryPrice * (1 + TRAIL_PCT);
-  for (let i = exitIdx; i < bars.length; i++) {
-    if (bars[i].low <= stop) return null;
-    if (bars[i].high >= goal) return i;
-  }
-  return null;
-}
-
-function runBacktest(bars, tf) {
-  const n = bars.length;
-  const closes = bars.map((b) => b.close);
-  const fast = ema(closes, 20), slow = ema(closes, 50);
-  const cross = bars.map((_, i) => i >= WARMUP && fast[i] > slow[i] && !(fast[i - 1] > slow[i - 1]));
-  const unit = tf === "M" ? "months" : "weeks";
-  const trades = [];
-  let i = 0;
-  while (i < n - 1) {
-    if (!cross[i]) { i++; continue; }
-    const entryIdx = i + 1;
-    const entry = bars[entryIdx].open;
-    const stop = entry * (1 - STOP_PCT), target = entry * (1 + TARGET_PCT);
-    let exitIdx = null, exitPrice = null, reason = null;
-
-    for (let j = entryIdx; j < n; j++) {
-      const b = bars[j];
-      if (j > entryIdx) {
-        if (b.open <= stop) { exitIdx = j; exitPrice = b.open; reason = "Stop -20% (gap)"; break; }
-        if (b.open >= target) { exitIdx = j; exitPrice = b.open; reason = "Target +30% (gap)"; break; }
-      }
-      const hitStop = b.low <= stop, hitTarget = b.high >= target;
-      if (hitStop && hitTarget) { exitIdx = j; exitPrice = stop; reason = "Stop -20% (same bar as target)"; break; }
-      if (hitStop) { exitIdx = j; exitPrice = stop; reason = "Stop -20%"; break; }
-      if (hitTarget) { exitIdx = j; exitPrice = target; reason = "Target +30%"; break; }
-    }
-    if (exitIdx === null) { exitIdx = n - 1; exitPrice = bars[n - 1].close; reason = "Open (marked at last close)"; }
-
-    let peak = 0;
-    for (let k = entryIdx; k <= exitIdx; k++) peak = Math.max(peak, bars[k].high);
-    const isTarget = reason.startsWith("Target");
-    let reached70 = "-", barsTo70 = null;
-    if (isTarget) {
-      const idx = whatIf70(bars, exitIdx, entry);
-      reached70 = idx === null ? "No" : "Yes";
-      barsTo70 = idx === null ? null : idx - entryIdx;
-    }
-    trades.push({
-      trade: trades.length + 1,
-      entryDate: bars[entryIdx].date,
-      entryPrice: +entry.toFixed(2),
-      exitDate: bars[exitIdx].date,
-      exitPrice: +exitPrice.toFixed(2),
-      reason,
-      peakGainPct: +((peak / entry - 1) * 100).toFixed(1),
-      plPct: +((exitPrice / entry - 1) * 100).toFixed(1),
-      plRs: +(exitPrice - entry).toFixed(2),
-      duration: exitIdx - entryIdx,
-      durationUnit: unit,
-      reached70,
-      barsTo70,
-    });
-    i = exitIdx + 1;
-    while (i < n - 1 && !cross[i]) i++;
-  }
-  return trades;
-}
-
-function summarize(trades) {
-  const closed = trades.filter((t) => !t.reason.startsWith("Open"));
-  if (!closed.length) return null;
-  const pl = closed.map((t) => t.plPct);
-  return {
-    totalTrades: trades.length,
-    winPct: +((pl.filter((x) => x > 0).length / pl.length) * 100).toFixed(1),
-    avgPlPct: +(pl.reduce((a, b) => a + b, 0) / pl.length).toFixed(1),
-    bestPct: Math.max(...pl),
-    worstPct: Math.min(...pl),
-  };
 }
 
 module.exports = async (req, res) => {
@@ -200,21 +91,28 @@ module.exports = async (req, res) => {
     const symbol = String(req.query.symbol || "").toUpperCase();
     const tf = req.query.tf === "M" ? "M" : "W";
     const years = Math.min(Math.max(parseInt(req.query.years || "10", 10), 1), 20);
-    if (!/^[A-Z0-9&\-]+$/.test(symbol)) {
-      res.status(400).json({ error: "valid symbol required" });
-      return;
-    }
+    if (!/^[A-Z0-9&\-]+$/.test(symbol)) { res.status(400).json({ error: "valid symbol required" }); return; }
+
+    const today = istNow();
     const jwt = await angelLogin();
     const token = await findToken(jwt, symbol);
-    const daily = await fetchDaily(jwt, token, years);
-    const bars = aggregate(daily, tf);
-    if (bars.length < WARMUP + 5) {
-      res.status(200).json({ symbol, tf, bars: bars.length, trades: [], summary: null,
-        note: "Not enough history for 20/50 EMA" });
+    // one extra year is downloaded only so the 50 EMA is warmed up when the 10-year window starts
+    let daily = await fetchDaily(jwt, token, years + (tf === "M" ? 5 : 1.2));
+    // today's candle is still forming until the market has settled (after 16:00 IST)
+    if (daily.length && daily[daily.length - 1].date >= today.date && today.dow >= 1 && today.dow <= 5 && today.minutes < 16 * 60) daily.pop();
+    if (daily.length < 100) {
+      res.status(200).json({ symbol, tf, years, bars: 0, trades: [], summary: null, adjustments: [], note: "Not enough price history at Angel One" });
       return;
     }
-    const trades = runBacktest(bars, tf);
-    res.status(200).json({ symbol, tf, bars: bars.length, trades, summary: summarize(trades) });
+    const fixed = fixSplits(daily);
+    const from = new Date(Date.now() - years * 365 * 86400000).toISOString().slice(0, 10);
+    const out = runBacktest(fixed.rows, tf, { today, from });
+    const note = out.bars < WARMUP + 2 ? "Not enough history for the 20/50 EMA (needs 50+ " + (tf === "M" ? "months" : "weeks") + ")" : undefined;
+    res.status(200).json({
+      symbol, tf, years, bars: out.bars,
+      firstDate: fixed.rows[0].date, lastDate: fixed.rows[fixed.rows.length - 1].date,
+      trades: out.trades, summary: summarize(out.trades), adjustments: fixed.notes, note,
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
