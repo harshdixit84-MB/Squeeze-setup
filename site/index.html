@@ -305,7 +305,7 @@ function detail(d){
  return h+'<p><a href="#" class="hd">Hide</a></p>';
 }
 function draw(){
- const q=$('qq').value.toUpperCase(),ind=$('qi').value,f=R.filter(r=>(!ind||r.industry==ind)&&(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q));
+ const q=$('qq').value.toUpperCase(),ind=$('qi').value,f=R.filter(r=>(!ind||r.industry==ind)&&(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q)).sort((a,b)=>((a.price==null)-(b.price==null))||(a.price-b.price));   // price low to high, stocks without a price at the end
  $('qt').innerHTML='<tr>'+['#','Stock','Company','Industry','Series','Price (last close)',(TF()=='M'?'Monthly':'Weekly')+' 20/50 backtest'].map(c=>`<th>${c}</th>`).join('')+'</tr>'+
  (f.map((r,i)=>{const x=res[K(r.symbol)]||{},st=x.loading?'Running... (can take 10-30 s)':x.error?`<span class="r">${esc(x.error)}</span>`:x.data?`Done - ${x.data.trades.length} trades${x.show?'':' <a href="#" class="sh">show</a>'}`:'';
   return `<tr><td>${i+1}</td><td><a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+r.tv)}" target="_blank" rel="noopener">${esc(r.symbol)}</a></td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td><td>${esc(r.series)}</td><td style="text-align:right"${r.price_date?` title="Close of ${esc(r.price_date)}"`:''}>${r.price==null?'-':Number(r.price).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td><button class="cb" data-s="${esc(r.symbol)}"${busy?' disabled':''}>${x.data?'Recalculate':'Calculate'}</button> <small>${st}</small></td></tr>`+
