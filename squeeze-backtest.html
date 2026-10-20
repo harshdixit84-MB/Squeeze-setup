@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Squeeze Backtest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#081321; --surface-1:#13233a; --surface-2:#1a2f4d; --line:#274466;
+  --text:#e6eefb; --muted:#8fa6c4; --accent:#3d8bff; --green:#2fd08a; --red:#ff5d6c; --amber:#f5b942;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font-family:"Space Grotesk",sans-serif; }
+.wrap { max-width:1200px; margin:0 auto; padding:20px 16px 60px; }
+h1 { font-size:22px; margin:0 0 4px; }
+.sub { color:var(--muted); font-size:13px; margin-bottom:16px; }
+.controls { display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:var(--surface-1); border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:14px; }
+.controls label { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+select, input[type=number], input[type=text] { background:var(--surface-2); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:7px 9px; font-family:inherit; font-size:13px; }
+input[type=number] { width:70px; }
+input[type=text] { min-width:180px; }
+.count { margin-left:auto; font-size:12px; color:var(--muted); }
+table { width:100%; border-collapse:collapse; }
+.list th, .list td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); font-size:13px; }
+.list th { color:var(--muted); font-weight:600; font-size:12px; position:sticky; top:0; background:var(--bg); }
+.sym a { color:var(--accent); text-decoration:none; font-family:"IBM Plex Mono",monospace; font-weight:600; }
+.sym a:hover { text-decoration:underline; }
+button.calc { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:6px 14px; font-family:inherit; font-weight:600; font-size:12px; cursor:pointer; }
+button.calc:disabled { background:var(--surface-2); color:var(--muted); cursor:not-allowed; }
+.status { font-size:12px; color:var(--muted); }
+.status.err { color:var(--red); }
+.status.ok { color:var(--green); }
+.detail td { background:var(--surface-1); padding:12px 14px !important; }
+.sumrow { display:flex; flex-wrap:wrap; gap:18px; margin-bottom:10px; font-size:13px; }
+.sumrow b { font-family:"IBM Plex Mono",monospace; }
+.trades { font-family:"IBM Plex Mono",monospace; font-size:12px; }
+.trades th { color:var(--muted); font-weight:500; text-align:right; padding:5px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+.trades td { text-align:right; padding:5px 8px; border-bottom:1px solid #1d3352; white-space:nowrap; }
+.trades th:first-child, .trades td:first-child, .trades th:nth-child(6), .trades td:nth-child(6) { text-align:left; }
+.pos { color:var(--green); } .neg { color:var(--red); }
+.scroll { overflow-x:auto; }
+.note { color:var(--amber); font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Squeeze Backtest</h1>
+  <div class="sub">20 EMA crosses above 50 EMA &rarr; entry at next bar open. Exit: +30% target or &minus;20% stop (whichever hits first). +70% what-if tracked after the target exit. One stock at a time.</div>
+
+  <div class="controls">
+    <label>Timeframe
+      <select id="tf">
+        <option value="W">Weekly</option>
+        <option value="M">Monthly</option>
+      </select>
+    </label>
+    <label>Years of data <input type="number" id="years" min="1" max="20" value="10" /></label>
+    <label>Search <input type="text" id="q" placeholder="symbol..." /></label>
+    <span class="count" id="count"></span>
+  </div>
+
+  <table class="list">
+    <thead><tr><th>#</th><th>Symbol</th><th>Backtest</th><th>Status</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<script>
+// Squeeze list (dummy / REIT rows removed: DUMMYHEG, EMBASSY, BAGMANE, BIRET)
+const SYMBOLS = ("360ONE,AIAENG,APLAPOLLO,AUBANK,ABBOTINDIA,ATGL,ABCAPITAL,AJANTPHARM,ALKEM,ANTHEM,APARINDS,ASHOKLEY,ASTERDM,ASTRAL,AUROPHARMA,AIIL,BAJAJHFL,BALKRISIND,BANKINDIA,MAHABANK,BERGEPAINT,BDL,BHARATFORG,BHEL,BHARTIHEXA,GROWW,BIOCON,BLUESTARCO,CRISIL,COCHINSHIP,COFORGE,COLPAL,CONCOR,COROMANDEL,DABUR,DALBHARAT,DIXON,ENDURANCE,ESCORTS,EXIDEIND,NYKAA,FEDERALBNK,FACT,FORTIS,GVT&D,GMRAIRPORT,GICRE,GLAXO,GLENMARK,MEDANTA,GODFRYPHLP,GODREJIND,GODREJPROP,FLUOROCHEM,HDBFS,HAVELLS,HEROMOTOCO,HEXT,HINDCOPPER,HINDPETRO,HUDCO,ICICIGI,ICICIAMC,ICICIPRULI,IDFCFIRSTB,ITCHOTELS,INDIANB,INDHOTEL,IOB,IRCTC,IREDA,INDUSTOWER,INDUSINDBK,NAUKRI,IPCALAB,JKCEMENT,JSWENERGY,JSWINFRA,JSL,JUBLFOOD,KPRMILL,KEI,KALYANKJIL,LTF,LTTS,LGEINDIA,LICHSGFIN,LAURUSLABS,LENSKART,LICI,LINDEINDIA,LLOYDSME,LODHA,LUPIN,MRF,M&MFIN,MANKIND,MARICO,MFSL,MEESHO,MOTILALOFS,MPHASIS,MCX,NHPC,NLCINDIA,NMDC,NTPCGREEN,NH,NATIONALUM,NAM-INDIA,OBEROIRLTY,OIL,PAYTM,OFSS,POLICYBZR,PIIND,PAGEIND,PATANJALI,PERSISTENT,PETRONET,PHOENIXLTD,PIRAMALFIN,PREMIERENE,PRESTIGE,RECLTD,RADICO,RVNL,SBICARD,SRF,SCHAEFFLER,SHREECEM,SAIL,SUNDARMFIN,SUPREMEIND,SUZLON,SWIGGY,TATACOMM,TATAINVEST,THERMAX,TORNTPOWER,TIINDIA,UNOMINDA,UPL,UBL,UNITDSPR,VMM,VOLTAS,WAAREEENER,YESBANK,ACC,ACMESOLAR,AWL,AADHARHFC,AARTIIND,AAVAS,ACE,ACUTAAS,ABREL,ABSLAMC,CPPLUS,AEGISLOG,AEGISVOPAK,AETHER,AFCONS,AFFLE,ABDL,ARE&M,AMBER,ANANDRATHI,ANANTRAJ,ANGELONE,ANURAS,APOLLOTYRE,APTUS,ASAHIINDIA,ATHERENERG,ATUL,AVANTIFEED,AZAD,BEML,BLS,BALRAMCHIN,BANDHANBNK,BATAINDIA,BELRISE,BHARATCOAL,BSOFT,BBOX,FIRSTCRY,BRIGADE,CCL,CESC,CIEINDIA,CANFINHOME,CANHLIFE,CAPLIPOINT,CGCL,CARBORUNIV,CARTRADE,CASTROLIND,CEATLTD,CEMPRO,CENTRALBK,CDSL,CMPDI,CHAMBLFERT,CHENNPETRO,CHOICEIN,CHOLAHLDNG,CUB,CLEANMAX,CLEAN,COHANCE,CAMS,CONCORDBIO,CRAFTSMAN,CREDITACC,CROMPTON,CUPID,CYIENT,DOMS,DATAPATTNS,DEEPAKFERT,DEEPAKNTR,DELHIVERY,DEVYANI,LALPATHLAB,EIDPARRY,EIHOTEL,ELECON,ELGIEQUIP,EMAMILTD,EMCURE,EMMVEE,ENGINERSIN,FINCABLES,FSL,FIVESTAR,FORCEMOT,FRACTAL,GABRIEL,GALLANTT,GRSE,GILLETTE,GLAND,GPIL,GRANULES,GRAPHITE,GRAVITA,GESHIP,GMDCLTD,HBLENGINE,HEGAM,HFCL,HSCL,HOMEFIRST,HONASA,HONAUT,IDBI,IFCI,IIFL,INOXINDIA,IRB,IRCON,ITI,INDIACEM,INDIAMART,IEX,IGL,INOXWIND,INTELLECT,IGIL,IKS,JBMA,JKTYRE,JMFINANCIL,JSWCEMENT,JAINREC,JPPOWER,J&KBANK,JINDALSAW,JUBLINGREA,JWL,JYOTICNC,KPITTECH,KSB,KAJARIACER,KPIL,KARURVYSYA,KAYNES,KEC,KFINTECH,KIRLOSBROS,KIRLOSENG,KIMS,LTFOODS,LEMONTREE,MMTC,MTARTECH,MGL,MANAPPURAM,MRPL,MINDACORP,MSUMI,NATCOPHARM,NBCC,NCC,NSLNISP,NAVA,NAVINFLUOR,NETWEB,NEULANDLAB,NUVAMA,NUVOCO,OLAELEC,OLECTRA,ONESOURCE,PCBL,PGEL,PNBHOUSING,PTCIL,PVRINOX,PARADEEP,PWL,PINELABS,PPLPHARMA,POLYMED,POONAWALLA,PFOCUS,PRIVISCL,RRKABEL,RBLBANK,RHIM,RITES,RAILTEL,RAINBOW,RKFORGE,REDINGTON,RPOWER,RUBICON,SJVN,SHRIPISTON,SAGILITY,SAILIFE,SAMMAANCAP,SANSERA,SARDAEN,SCHNEIDER,SCI,SHYAMMETL,SIGNATURE,SOBHA,SONACOMS,STARHEALTH,STLTECH,SUMICHEM,SUNTV,SWANCORP,SYNGENE,SYRMA,TBOTEK,TDPOWERSYS,TATACHEM,TATAELXSI,TATATECH,TTML,TECHNOE,TEGA,TEJASNET,TENNIND,THANGAMAYL,NIACL,RAMCOCEM,TIMKEN,TITAGARH,TARIL,TRIDENT,TRITURBINE,UCOBANK,UTIAMC,URBANCO,USHAMART,VTL,VISL,VOGL,VEDPOWER,VIJAYA,WELCORP,WELSPUNLIV,WHIRLPOOL,WOCKPHARMA,ZFCVINDIA,ZEEL,ZENTEC,ZENSARTECH,ZYDUSWELL,ECLERX").split(",");
+
+const rowsEl = document.getElementById("rows");
+const tfEl = document.getElementById("tf");
+const yearsEl = document.getElementById("years");
+const qEl = document.getElementById("q");
+const countEl = document.getElementById("count");
+const results = {};   // key: SYMBOL|TF -> {data} or {error}
+let running = false;
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function cls(n) { return n > 0 ? "pos" : n < 0 ? "neg" : ""; }
+function sign(n) { return (n > 0 ? "+" : "") + n; }
+
+function render() {
+  const q = qEl.value.trim().toUpperCase();
+  const tf = tfEl.value;
+  const list = SYMBOLS.filter(s => !q || s.includes(q));
+  countEl.textContent = list.length + " stocks";
+  let html = "";
+  list.forEach((s, i) => {
+    const key = s + "|" + tf;
+    const r = results[key];
+    let status = "";
+    if (r && r.loading) status = '<span class="status">Running...</span>';
+    else if (r && r.error) status = '<span class="status err">' + esc(r.error) + '</span>';
+    else if (r && r.data) status = '<span class="status ok">Done (' + r.data.trades.length + ' trades)</span>';
+    html += '<tr>'
+      + '<td>' + (i + 1) + '</td>'
+      + '<td class="sym"><a href="https://www.tradingview.com/chart/?symbol=' + encodeURIComponent("NSE:" + s) + '" target="_blank" rel="noopener">' + esc(s) + '</a></td>'
+      + '<td><button class="calc" data-sym="' + esc(s) + '"' + (running ? " disabled" : "") + '>Calculate</button></td>'
+      + '<td>' + status + '</td></tr>';
+    if (r && r.data) html += detailRow(r.data);
+  });
+  rowsEl.innerHTML = html;
+}
+
+function detailRow(d) {
+  const unit = d.tf === "M" ? "months" : "weeks";
+  let h = '<tr class="detail"><td colspan="4">';
+  if (d.note) h += '<div class="note">' + esc(d.note) + ' (bars: ' + d.bars + ')</div>';
+  if (d.summary) {
+    const s = d.summary;
+    h += '<div class="sumrow">'
+      + '<span>Trades: <b>' + s.totalTrades + '</b></span>'
+      + '<span>Win %: <b>' + s.winPct + '</b></span>'
+      + '<span>Avg P/L: <b class="' + cls(s.avgPlPct) + '">' + sign(s.avgPlPct) + '%</b></span>'
+      + '<span>Best: <b class="pos">' + sign(s.bestPct) + '%</b></span>'
+      + '<span>Worst: <b class="neg">' + s.worstPct + '%</b></span>'
+      + '<span>Bars: <b>' + d.bars + '</b></span></div>';
+  }
+  if (!d.trades.length) {
+    h += '<div class="status">No completed setups found.</div>';
+  } else {
+    h += '<div class="scroll"><table class="trades"><thead><tr>'
+      + '<th>Trade</th><th>Entry date</th><th>Entry</th><th>Exit date</th><th>Exit</th><th>Exit reason</th>'
+      + '<th>Peak gain %</th><th>P/L %</th><th>P/L Rs</th><th>Duration (' + unit + ')</th><th>Reached +70%?</th><th>' + unit + ' to +70%</th>'
+      + '</tr></thead><tbody>';
+    d.trades.forEach(t => {
+      h += '<tr><td>' + t.trade + '</td><td>' + esc(t.entryDate) + '</td><td>' + t.entryPrice + '</td>'
+        + '<td>' + esc(t.exitDate) + '</td><td>' + t.exitPrice + '</td><td>' + esc(t.reason) + '</td>'
+        + '<td>' + t.peakGainPct + '</td><td class="' + cls(t.plPct) + '">' + sign(t.plPct) + '</td>'
+        + '<td class="' + cls(t.plRs) + '">' + sign(t.plRs) + '</td><td>' + t.duration + '</td>'
+        + '<td>' + esc(t.reached70) + '</td><td>' + (t.barsTo70 === null ? "-" : t.barsTo70) + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+  return h + '</td></tr>';
+}
+
+async function calculate(sym) {
+  if (running) return;
+  const tf = tfEl.value;
+  const years = Math.min(Math.max(parseInt(yearsEl.value, 10) || 10, 1), 20);
+  const key = sym + "|" + tf;
+  running = true;
+  results[key] = { loading: true };
+  render();
+  try {
+    const url = "/api/backtest?symbol=" + encodeURIComponent(sym) + "&tf=" + tf + "&years=" + years;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || ("HTTP " + resp.status));
+    results[key] = { data };
+  } catch (e) {
+    results[key] = { error: e.message };
+  }
+  running = false;
+  render();
+}
+
+rowsEl.addEventListener("click", e => {
+  const b = e.target.closest("button.calc");
+  if (b) calculate(b.dataset.sym);
+});
+qEl.addEventListener("input", render);
+tfEl.addEventListener("change", () => {
+  yearsEl.value = tfEl.value === "M" ? 20 : 10;   // monthly needs more history for EMA50
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
