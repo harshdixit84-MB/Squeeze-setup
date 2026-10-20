@@ -43,6 +43,8 @@ jobs:
         run: python backtest/scan_ema_cross.py
       - name: Find monthly Supertrend flips (green / red)
         run: python backtest/scan_supertrend.py
+      - name: Find weekly 20/50 EMA crossovers (active, not yet +30% / -20%)
+        run: python backtest/scan_weekly_cross.py
       - name: Save results into the repo
         run: |
           git config user.name "backtest-bot"

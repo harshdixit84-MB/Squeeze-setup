@@ -23,7 +23,7 @@ tr.cm td{background:#fde68a33}.up{color:#16a34a}.dn{color:#dc2626}.nw{color:#256
 .chip.on{opacity:1;background:#dbeafe;border-color:#2563eb;font-weight:600}.chip .x{width:20px;height:20px;line-height:19px;text-align:center;border-radius:50%;font-size:15px}.chip .x:hover{background:#fecaca;color:#b91c1c}
 .fs{grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr))!important}table.sm{font-size:12px}table.sm td,table.sm th{padding:3px 6px}
 </style></head><body>
-<div class="tabs"><button id="b1" class="on">Backtest</button><button id="b2">20/50 Crossover</button><button id="b3">Fund Portfolios</button><button id="b4">VTD 4H Buy</button><button id="b5">Monthly Supertrend</button><button id="b6">Squeeze List</button></div>
+<div class="tabs"><button id="b1" class="on">Backtest</button><button id="b2">20/50 Crossover</button><button id="b3">Fund Portfolios</button><button id="b4">VTD 4H Buy</button><button id="b5">Monthly Supertrend</button><button id="b6">Squeeze List</button><button id="b7">Weekly Crossover</button></div>
 <div id="tab1">
 <h1>Quiet-then-Blast Backtest</h1>
 <p id="meta" class="n">Loading...</p>
@@ -337,11 +337,37 @@ fetch('data/squeeze_list.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then
 .catch(()=>$('qm').textContent='Not ready yet - run the Refresh Squeeze list workflow.');
 })();
 </script>
+<div id="tab7" hidden>
+<h1>Weekly Crossover</h1>
+<p class="n" id="wm">Loading...</p>
+<p class="n"><b>Rule (weekly chart, Squeeze list stocks):</b> the 20 EMA closed above the 50 EMA on a closed weekly candle after being at or below it the week before. The entry is the <b>open of the next week</b>. A stock stays here while it is still inside the band: it leaves (is skipped) as soon as a daily close is <b>+30% or more above</b> the entry or <b>-20% or more below</b> it. Only the latest crossover of each stock is used. <b class="nw">Highlighted rows</b> are fresh: the crossover happened in the last closed week, so the entry condition has just been met (when the new week has no price yet, the entry is the coming open). Prices are the last close from Angel One, refreshed with the Daily scan after the market closes.</p>
+<input id="wq" placeholder="Search stock / company / industry" style="width:min(320px,100%)"> <label style="white-space:nowrap"><input type="checkbox" id="wf"> Fresh only</label>
+<div class="w"><table id="wt"></table></div>
+</div>
+<script>
+(()=>{
+const $=i=>document.getElementById(i);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const px=n=>n==null?'-':Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+let D=null;
+function draw(){
+ if(!D)return;
+ const q=$('wq').value.toUpperCase(),f=D.stocks.filter(r=>(!$('wf').checked||r.fresh)&&(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q));
+ $('wt').innerHTML='<tr>'+['#','Stock','Company','Industry','Crossover week','Entry date','Entry price','Last close','Since entry %','Target (+30%)','Stop (-20%)','Status'].map(c=>`<th>${c}</th>`).join('')+'</tr>'+
+ (f.map((r,i)=>{const pend=r.entry_price==null;
+  return `<tr${r.fresh?' class="cm"':''}><td>${i+1}</td><td><a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+r.tv)}&interval=W" target="_blank" rel="noopener">${esc(r.symbol)}</a></td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td><td>${esc(r.signal_week)}</td><td>${pend?'next open':esc(r.entry_date)}</td><td style="text-align:right">${px(r.entry_price)}</td><td style="text-align:right">${px(r.last_close)}</td><td style="text-align:right" class="${r.since_pct>0?'g':r.since_pct<0?'r':''}">${r.since_pct==null?'-':(r.since_pct>0?'+':'')+r.since_pct}</td><td style="text-align:right">${px(r.target_price)}</td><td style="text-align:right">${px(r.stop_price)}</td><td>${r.fresh?'<span class="nw">FRESH</span> '+(pend?'entry at next week\'s open':'crossover last week'):'Active'}</td></tr>`}).join('')||'<tr><td colspan="12">No stock matches.</td></tr>');
+ $('wm').textContent=`${f.length} of ${D.active} active stocks shown (${D.fresh} fresh). Skipped: ${D.skipped_target} reached +30%, ${D.skipped_stop} fell to -20%. Prices up to ${D.data_date}; updated ${D.updated}.`;
+}
+$('wq').oninput=$('wf').onchange=draw;
+fetch('data/weekly_cross_list.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(k=>{D=k;draw()})
+.catch(()=>$('wm').textContent='Not ready yet - run the Daily scan workflow.');
+})();
+</script>
 <script>
 (()=>{const $=i=>document.getElementById(i);
-const show=n=>{[1,2,3,4,5,6].forEach(i=>{const t=$('tab'+i),b=$('b'+i);if(t)t.hidden=i!=n;if(b)b.className=i==n?'on':''});history.replaceState(null,'',['','#backtest','#crossover','#funds','#vtd','#supertrend','#squeeze'][n])};
-[1,2,3,4,5,6].forEach(i=>$('b'+i).onclick=()=>show(i));
-show({'#crossover':2,'#funds':3,'#vtd':4,'#supertrend':5,'#squeeze':6}[location.hash]||1);
+const show=n=>{[1,2,3,4,5,6,7].forEach(i=>{const t=$('tab'+i),b=$('b'+i);if(t)t.hidden=i!=n;if(b)b.className=i==n?'on':''});history.replaceState(null,'',['','#backtest','#crossover','#funds','#vtd','#supertrend','#squeeze','#weekly'][n])};
+[1,2,3,4,5,6,7].forEach(i=>$('b'+i).onclick=()=>show(i));
+show({'#crossover':2,'#funds':3,'#vtd':4,'#supertrend':5,'#squeeze':6,'#weekly':7}[location.hash]||1);
 })();
 </script>
 </body></html>
