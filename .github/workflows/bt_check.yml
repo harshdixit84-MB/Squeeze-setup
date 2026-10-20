@@ -1,0 +1,30 @@
+name: BT check (temporary)
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install --no-audit --no-fund
+      - name: Run the backtest API on real Angel One data
+        env:
+          ANGEL_API_KEY: ${{ secrets.ANGEL_API_KEY }}
+          ANGEL_CLIENT_ID: ${{ secrets.ANGEL_CLIENT_ID }}
+          ANGEL_PIN: ${{ secrets.ANGEL_PIN }}
+          ANGEL_TOTP_SECRET: ${{ secrets.ANGEL_TOTP_SECRET }}
+        run: node bt_check/run.js
+      - name: Save result
+        if: always()
+        run: |
+          git config user.name "backtest-bot"
+          git config user.email "backtest-bot@users.noreply.github.com"
+          git add bt_check/result.json
+          git commit -m "bt check result" || echo nothing
+          git pull --rebase origin main
+          git push
