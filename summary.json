@@ -1,1 +1,1 @@
-{"updated":null,"stocks":{}}
+{"updated":"2026-10-21T03:09:23.281Z","stocks":{"CASTROLIND":{"savedAt":"2026-10-21T03:09:23.281Z","asOf":"2026-10-19","keys":{"W":"2026-10-12","M":"2026-09"},"W":{"bars":781,"stats":{"trades":5,"winPct":25,"peakMax":42.9,"peakMin":1}},"M":{"bars":180,"stats":{"trades":1,"winPct":100,"peakMax":31.5,"peakMin":31.5}}}}}
