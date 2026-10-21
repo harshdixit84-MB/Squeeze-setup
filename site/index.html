@@ -283,18 +283,37 @@ Promise.all([fetch('data/supertrend_list.json').then(r=>{if(!r.ok)throw 0;return
 <h1>Squeeze List</h1>
 <p class="n" id="qm">Loading...</p>
 <p class="n">Every stock in the Squeeze tab of your Google Sheet. Click a stock name to open its chart in TradingView. The list refreshes every morning and with each Daily scan. <b>Price</b> is the last close from Angel One (updated after the market closes, not a live price).</p>
-<p class="n"><b>Calculate (weekly or monthly backtest, last 10 years, one stock at a time, prices from Angel One):</b> the 20 EMA closes above the 50 EMA on a closed weekly (or monthly) candle, the trade starts at the next week's (month's) open and ends at +30% (target) or -20% from entry (stop), whichever the daily candles show first. After a +30% exit it also tells whether price later reached +70% (trail target hit) or fell to -20% first (stoploss hit). The next trade needs a fresh crossover after the previous trade has closed. If target and stop fall inside one daily candle, the stop is assumed first.</p>
-<input id="qq" placeholder="Search stock / company / industry" style="width:min(320px,100%)"> <select id="qi"><option value="">All industries</option></select> <label style="white-space:nowrap"><input type="checkbox" id="wo"> Watchlist only (<span id="wc">0</span>)</label> Backtest chart: <select id="btf"><option value="W">Weekly</option><option value="M">Monthly</option></select>
+<p class="n"><b>Calculate</b> (manual, one stock at a time, last 10 years, prices from Angel One): the 20 EMA closes above the 50 EMA on a closed candle, the trade starts at the next candle's open and ends at +30% (target) or -20% from entry (stop), whichever the daily candles show first. After a +30% exit it also tells whether price later reached +70% (trail target hit) or fell to -20% first (stoploss hit). The next trade needs a fresh crossover after the previous trade has closed. If target and stop fall inside one daily candle, the stop is assumed first. <b>One click calculates both the weekly and the monthly chart and saves the result</b> (nothing is calculated twice): the <b>Weekly</b> and <b>Monthly</b> columns show win %, total trades and the highest / lowest peak gain of its trades (win % counts closed trades; a trade still open is in the total). The button turns into <b>Update</b> only after a new weekly or monthly candle has closed. The dropdown below only chooses which trade table "show" opens; it never changes the two columns.</p>
+<p class="n" id="sqs"></p>
+<input id="qq" placeholder="Search stock / company / industry" style="width:min(320px,100%)"> <select id="qi"><option value="">All industries</option></select> <label style="white-space:nowrap"><input type="checkbox" id="wo"> Watchlist only (<span id="wc">0</span>)</label> Trade table of: <select id="btf"><option value="W">Weekly</option><option value="M">Monthly</option></select>
 <div class="w"><table id="qt"></table></div>
 </div>
 <script>
 (()=>{
 const $=i=>document.getElementById(i);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let R=[],PD='';const res={};
+let R=[],PD='';
 let WL=new Set();try{WL=new Set(JSON.parse(localStorage.getItem('sqWatch')||'[]'))}catch(e){}   // watchlist: kept in this browser until you untick it yourself
-const saveWL=()=>{try{localStorage.setItem('sqWatch',JSON.stringify([...WL]))}catch(e){}};let busy=null;const TF=()=>$('btf').value,K=s=>s+'|'+TF();   // res[symbol] = {loading} | {error} | {data, show}; busy = the one symbol being calculated
+const saveWL=()=>{try{localStorage.setItem('sqWatch',JSON.stringify([...WL]))}catch(e){}};
+const res={};            // symbol -> {loading} | {error} | {rec, show, saveError}   rec = the whole result of one calculation (weekly + monthly)
+let ST={stocks:{}};      // results saved in the repo (light version: the four numbers per chart + dates), loaded from /api/results
+let busy=null;const TF=()=>$('btf').value;
 const sg=n=>(n>0?'+':'')+n,cl=n=>n>0?'g':n<0?'r':'';
+// newest closed weekly / monthly candle today (IST) - same rule as expectedKey() in api/_engine.js
+function expKeys(){
+ const d=new Date(Date.now()+5.5*36e5),dow=d.getUTCDay(),iso=d.toISOString().slice(0,10),mon=new Date(Date.parse(iso+'T00:00:00Z')-((dow+6)%7)*864e5);
+ return {W:(dow==0||dow==6)?mon.toISOString().slice(0,10):new Date(mon-7*864e5).toISOString().slice(0,10),M:new Date(Date.UTC(+iso.slice(0,4),+iso.slice(5,7)-2,1)).toISOString().slice(0,7)};
+}
+const isCurrent=L=>{const e=expKeys();return !!(L&&L.keys&&L.keys.W>=e.W&&L.keys.M>=e.M)};
+const lightOf=s=>ST.stocks[s]||(res[s]&&res[s].rec)||null;      // saved version, or the one just calculated if saving failed
+const view=(rec,t)=>{const x=rec[t]||{};return {tf:t,bars:x.bars,trades:x.trades||[],summary:x.summary,note:x.note,adjustments:rec.adjustments,firstDate:rec.firstDate,lastDate:rec.asOf}};
+function cell(L,t){
+ if(!L)return '<span style="opacity:.5">-</span>';
+ const x=L[t];if(!x)return '-';
+ if(!x.stats||!x.stats.trades)return '<span style="opacity:.6">0 trades</span>'+(x.note?'<br><small style="opacity:.7">not enough history</small>':'');
+ const q=x.stats;
+ return `<b>${q.winPct==null?'-':q.winPct+'%'}</b> win &middot; ${q.trades} trade${q.trades==1?'':'s'}<br><small>peak <span class="g">${sg(q.peakMax)}%</span> max / <span class="g">${sg(q.peakMin)}%</span> min</small>`;
+}
 function detail(d){
  const u=d.tf=='M'?'months':'weeks';let h='';
  if(d.note)h+=`<p class="n">${esc(d.note)}</p>`;
@@ -308,33 +327,60 @@ function detail(d){
 }
 function draw(){
  const q=$('qq').value.toUpperCase(),ind=$('qi').value,f=R.filter(r=>(!ind||r.industry==ind)&&(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q)&&(!$('wo').checked||WL.has(r.symbol))).sort((a,b)=>((a.price==null)-(b.price==null))||(a.price-b.price));   // price low to high, stocks without a price at the end
- $('qt').innerHTML='<tr>'+['#','Stock','Company','Industry','Series','Price (last close)','Watch',(TF()=='M'?'Monthly':'Weekly')+' 20/50 backtest'].map(c=>`<th>${c}</th>`).join('')+'</tr>'+
- (f.map((r,i)=>{const x=res[K(r.symbol)]||{},st=x.loading?'Running... (can take 10-30 s)':x.error?`<span class="r">${esc(x.error)}</span>`:x.data?`Done - ${x.data.trades.length} trades${x.show?'':' <a href="#" class="sh">show</a>'}`:'';
-  return `<tr><td>${i+1}</td><td><a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+r.tv)}" target="_blank" rel="noopener">${esc(r.symbol)}</a></td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td><td>${esc(r.series)}</td><td style="text-align:right"${r.price_date?` title="Close of ${esc(r.price_date)}"`:''}>${r.price==null?'-':Number(r.price).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td style="text-align:center"><input type="checkbox" class="wl" data-s="${esc(r.symbol)}" title="Add to / remove from watchlist"${WL.has(r.symbol)?' checked':''}></td><td><button class="cb" data-s="${esc(r.symbol)}"${busy?' disabled':''}>${x.data?'Recalculate':'Calculate'}</button> <small>${st}</small></td></tr>`+
-  (x.data&&x.show?`<tr class="dt" data-s="${esc(r.symbol)}"><td colspan="8">${detail(x.data)}</td></tr>`:'')}).join('')||'<tr><td colspan="8">'+($('wo').checked?'Nothing in the watchlist yet - tick Watch on a stock.':'No stock matches.')+'</td></tr>');
- $('wc').textContent=WL.size;$('qm').textContent=`${f.length} of ${R.length} stocks shown. `+(PD?`Prices are the last close of ${PD}.`:'Prices appear after the next Daily scan or Refresh Squeeze list run.');
+ const tip='Win % (closed trades) / total trades / highest and lowest peak gain of its trades';
+ $('qt').innerHTML='<tr>'+['#','Stock','Company','Industry','Series','Price (last close)'].map(c=>`<th>${c}</th>`).join('')+`<th title="${tip}">Weekly<br><small style="font-weight:400">win % &middot; trades &middot; peak max/min</small></th><th title="${tip}">Monthly<br><small style="font-weight:400">win % &middot; trades &middot; peak max/min</small></th><th>Watch</th><th>Backtest</th></tr>`+
+ (f.map((r,i)=>{
+  const x=res[r.symbol]||{},saved=ST.stocks[r.symbol],L=lightOf(r.symbol),cur=isCurrent(saved);
+  const label=x.loading?'Running...':saved?(cur?'Done &#10003;':'Update'):'Calculate',dis=busy||(saved&&cur&&!x.error);
+  let st='';
+  if(x.loading)st='Running... (can take 10-30 s)';
+  else if(x.error)st=`<span class="r">${esc(x.error)}</span>`;
+  else if(x.saveError)st=`<span class="r">Not saved: ${esc(x.saveError)}</span>`;
+  else if(saved)st=`saved ${esc((saved.savedAt||'').slice(0,10))}${cur?'':' - a new candle has closed'}`;
+  if(L&&!x.loading&&!(x.rec&&x.show))st+=` <a href="#" class="sh">show</a>`;
+  return `<tr><td>${i+1}</td><td><a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+r.tv)}" target="_blank" rel="noopener">${esc(r.symbol)}</a></td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td><td>${esc(r.series)}</td><td style="text-align:right"${r.price_date?` title="Close of ${esc(r.price_date)}"`:''}>${r.price==null?'-':Number(r.price).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td>${cell(L,'W')}</td><td>${cell(L,'M')}</td><td style="text-align:center"><input type="checkbox" class="wl" data-s="${esc(r.symbol)}" title="Add to / remove from watchlist"${WL.has(r.symbol)?' checked':''}></td><td><button class="cb" data-s="${esc(r.symbol)}"${dis?' disabled':''}>${label}</button> <small>${st}</small></td></tr>`+
+  (x.rec&&x.show?`<tr class="dt" data-s="${esc(r.symbol)}"><td colspan="10">${detail(view(x.rec,TF()))}</td></tr>`:'')}).join('')||'<tr><td colspan="10">'+($('wo').checked?'Nothing in the watchlist yet - tick Watch on a stock.':'No stock matches.')+'</td></tr>');
+ $('wc').textContent=WL.size;$('qm').textContent=`${f.length} of ${R.length} stocks shown. `+(PD?`Prices are the last close of ${PD}.`:'Prices appear after the next Daily scan or Refresh Squeeze list run.')+` ${Object.keys(ST.stocks).length} stocks calculated.`;
 }
 async function calc(s){
- if(busy)return;busy=s;const k=K(s),tf=TF();res[k]={loading:true};draw();
+ if(busy)return;busy=s;res[s]={loading:true};draw();
  try{
-  const r=await fetch('/api/backtest?symbol='+encodeURIComponent(s)+'&tf='+tf+'&years=10');
+  const r=await fetch('/api/backtest?symbol='+encodeURIComponent(s)+'&years=10');
   let d;try{d=await r.json()}catch(e){throw new Error('API not reachable (HTTP '+r.status+') - Vercel setup problem')}
   if(!r.ok||d.error)throw new Error(d.error||'HTTP '+r.status);
-  res[k]={data:{...d,tf},show:true};
- }catch(e){res[k]={error:e.message}}
+  res[s]={rec:d,show:true,saveError:d.saved?null:(d.saveError||'not saved')};
+  if(d.saved)ST.stocks[s]={savedAt:d.savedAt,asOf:d.asOf,keys:d.keys,W:{bars:d.W.bars,stats:d.W.stats,note:d.W.note},M:{bars:d.M.bars,stats:d.M.stats,note:d.M.note}};
+ }catch(e){res[s]={error:e.message}}
  busy=null;draw();
+}
+async function showSaved(s){            // open the saved trade table of a stock (loaded from the repo when it was not calculated in this visit)
+ if(res[s]&&res[s].rec){res[s].show=true;return draw()}
+ res[s]={loading:true};draw();
+ try{
+  const r=await fetch('/api/results?symbol='+encodeURIComponent(s));const d=await r.json();
+  if(!r.ok||d.error)throw new Error(d.error||'HTTP '+r.status);
+  if(!d.result)throw new Error('No saved result found for '+s);
+  res[s]={rec:d.result,show:true};
+ }catch(e){res[s]={error:e.message}}
+ draw();
 }
 $('qt').onchange=e=>{const c=e.target.closest('input.wl');if(!c)return;c.checked?WL.add(c.dataset.s):WL.delete(c.dataset.s);saveWL();draw()};
 $('qt').onclick=e=>{
  const b=e.target.closest('button.cb');if(b)return calc(b.dataset.s);
  const h=e.target.closest('a.hd'),w=e.target.closest('a.sh');
- if(h){e.preventDefault();res[K(h.closest('tr.dt').dataset.s)].show=false;draw()}
- if(w){e.preventDefault();res[K(w.closest('tr').querySelector('button.cb').dataset.s)].show=true;draw()}
+ if(h){e.preventDefault();res[h.closest('tr.dt').dataset.s].show=false;draw()}
+ if(w){e.preventDefault();showSaved(w.closest('tr').querySelector('button.cb').dataset.s)}
 };
 $('qq').oninput=$('qi').onchange=$('btf').onchange=$('wo').onchange=draw;
 fetch('data/squeeze_list.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(k=>{R=k.stocks;PD=k.price_date||'';
  [...new Set(R.map(r=>r.industry).filter(Boolean))].sort().forEach(i=>{const o=document.createElement('option');o.value=o.textContent=i;$('qi').appendChild(o)});draw()})
 .catch(()=>$('qm').textContent='Not ready yet - run the Refresh Squeeze list workflow.');
+fetch('/api/results').then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{
+ if(d.configured===false)$('sqs').innerHTML='<span class="r">Saving is not set up yet</span> - Calculate works but results are lost on refresh. Add the Vercel environment variable GH_TOKEN (see the setup notes), then redeploy.';
+ else if(!ok||d.error)$('sqs').innerHTML='<span class="r">Could not load the saved results:</span> '+esc(d.error||'error');
+ else ST={stocks:d.stocks||{}};
+ draw();
+}).catch(()=>{$('sqs').innerHTML='<span class="r">Saved results not available</span> (the API is not reachable here).'});
 })();
 </script>
 <div id="tab7" hidden>

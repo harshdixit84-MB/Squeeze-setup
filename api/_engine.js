@@ -179,4 +179,30 @@ function summarize(trades) {
   };
 }
 
-module.exports = { istNow, periodKey, elapsed, fixSplits, aggregate, ema, simulate, whatIf, runBacktest, summarize, WARMUP };
+// the four numbers shown in the Weekly / Monthly columns of the Squeeze List: trades (all, a still open one included),
+// win % (closed trades only), highest and lowest peak gain % of the trades
+function stats(trades) {
+  if (!trades.length) return { trades: 0, winPct: null, peakMax: null, peakMin: null };
+  const closed = trades.filter((t) => !t.reason.startsWith("Open"));
+  const peaks = trades.map((t) => t.peakGainPct);
+  return {
+    trades: trades.length,
+    winPct: closed.length ? +((closed.filter((t) => t.plPct > 0).length / closed.length) * 100).toFixed(1) : null,
+    peakMax: Math.max(...peaks),
+    peakMin: Math.min(...peaks),
+  };
+}
+
+// key of the newest period that is complete today (same rule as aggregate(): a week is complete when it is before the current week
+// or it is Sat/Sun; a month when it is before the current month). A saved result is out of date once this key moves on.
+function expectedKey(today, tf) {
+  const nowKey = periodKey(today.date, tf);
+  if (tf === "M") {
+    const [y, m] = nowKey.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7);
+  }
+  const weekend = today.dow === 0 || today.dow === 6;
+  return weekend ? nowKey : new Date(ms(nowKey) - 7 * DAY).toISOString().slice(0, 10);
+}
+
+module.exports = { istNow, periodKey, elapsed, fixSplits, aggregate, ema, simulate, whatIf, runBacktest, summarize, stats, expectedKey, WARMUP };
