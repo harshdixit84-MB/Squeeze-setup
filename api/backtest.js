@@ -97,12 +97,12 @@ module.exports = async (req, res) => {
     const today = istNow();
     const keys = { W: expectedKey(today, "W"), M: expectedKey(today, "M") };   // newest closed weekly / monthly candle today
 
-    // already calculated and no new weekly / monthly candle has closed since: give back the saved result, do not call Angel again
-    // (?force=1 skips this check)
+    // already calculated (with the 20% / 10% targets too) and no new weekly / monthly candle has closed since: give back the saved
+    // result, do not call Angel again (?force=1 skips this check). A result saved before the 20% / 10% targets existed is calculated again.
     if (store.configured() && req.query.force !== "1") {
       let old = null;
       try { old = await store.loadOne(symbol); } catch (e) { /* storage trouble must not block a calculation */ }
-      if (old && old.keys && old.keys.W >= keys.W && old.keys.M >= keys.M) { res.status(200).json({ ...old, saved: true, fromStore: true }); return; }
+      if (old && old.alt && old.keys && old.keys.W >= keys.W && old.keys.M >= keys.M) { res.status(200).json({ ...old, saved: true, fromStore: true }); return; }
     }
 
     const jwt = await angelLogin();
@@ -115,17 +115,21 @@ module.exports = async (req, res) => {
 
     const fixed = fixSplits(daily);
     const from = new Date(Date.now() - years * 365 * 86400000).toISOString().slice(0, 10);
-    const one = (tf) => {
-      const out = runBacktest(fixed.rows, tf, { today, from });
+    // target 30% is the main result (record.W / record.M); the stop is always -20%. The same daily prices are run again with a
+    // 20% and a 10% target (record.alt) so the targets can be compared.
+    const one = (tf, target) => {
+      const out = runBacktest(fixed.rows, tf, { today, from, target });
       return {
         bars: out.bars, trades: out.trades, summary: summarize(out.trades), stats: stats(out.trades),
         note: out.bars < WARMUP + 2 ? "Not enough history for the 20/50 EMA (needs 50+ " + (tf === "M" ? "months" : "weeks") + ")" : undefined,
       };
     };
+    const alt = {};
+    for (const t of [0.2, 0.1]) alt[Math.round(t * 100)] = { W: one("W", t), M: one("M", t) };
     const record = {
       symbol, years, savedAt: new Date().toISOString(), keys,
       firstDate: fixed.rows[0].date, asOf: fixed.rows[fixed.rows.length - 1].date,   // asOf = last daily candle used
-      adjustments: fixed.notes, W: one("W"), M: one("M"),
+      adjustments: fixed.notes, W: one("W", 0.3), M: one("M", 0.3), alt,
     };
     let saved = false, saveError;
     if (!store.configured()) saveError = "Storage is not connected in Vercel, so this result is not saved";

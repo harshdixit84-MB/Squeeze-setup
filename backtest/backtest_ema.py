@@ -69,22 +69,22 @@ def ema(values, span):
     return out
 
 
-def simulate(daily, k0, entry):
-    stop, target = entry * (1 - STOP_PCT), entry * (1 + TARGET_PCT)
+def simulate(daily, k0, entry, tg=TARGET_PCT):
+    stop, target, lab = entry * (1 - STOP_PCT), entry * (1 + tg), f"Target +{round(tg * 100)}%"
     for k in range(k0, len(daily)):
         c = daily[k]
         if k > k0:
             if c["open"] <= stop:
                 return k, c["open"], "Stop -20% (gap)"
             if c["open"] >= target:
-                return k, c["open"], "Target +30% (gap)"
+                return k, c["open"], lab + " (gap)"
         hit_stop, hit_target = c["low"] <= stop, c["high"] >= target
         if hit_stop and hit_target:
             return k, stop, "Stop -20% (same day as target)"
         if hit_stop:
             return k, stop, "Stop -20%"
         if hit_target:
-            return k, target, "Target +30%"
+            return k, target, lab
     return None
 
 
@@ -104,7 +104,7 @@ def what_if(daily, start, entry):
     return "Running", None
 
 
-def run_backtest(daily, tf, today, from_date=None):
+def run_backtest(daily, tf, today, from_date=None, target=TARGET_PCT):
     bars = aggregate(daily, tf, today)
     nc = sum(1 for b in bars if b["complete"])
     if nc < WARMUP + 2:
@@ -121,7 +121,7 @@ def run_backtest(daily, tf, today, from_date=None):
             break
         k0 = bars[i + 1]["d0"]
         entry = daily[k0]["open"]
-        x, is_open = simulate(daily, k0, entry), False
+        x, is_open = simulate(daily, k0, entry, target), False
         if x is None:
             x, is_open = (len(daily) - 1, daily[-1]["close"], "Open (marked at last close)"), True
         k, price, reason = x

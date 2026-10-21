@@ -23,7 +23,7 @@ tr.cm td{background:#fde68a33}.up{color:#16a34a}.dn{color:#dc2626}.nw{color:#256
 .chip.on{opacity:1;background:#dbeafe;border-color:#2563eb;font-weight:600}.chip .x{width:20px;height:20px;line-height:19px;text-align:center;border-radius:50%;font-size:15px}.chip .x:hover{background:#fecaca;color:#b91c1c}
 .fs{grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr))!important}table.sm{font-size:12px}table.sm td,table.sm th{padding:3px 6px}
 </style></head><body>
-<div class="tabs"><button id="b1" class="on">Backtest</button><button id="b2">20/50 Crossover</button><button id="b3">Fund Portfolios</button><button id="b4">VTD 4H Buy</button><button id="b5">Monthly Supertrend</button><button id="b6">Squeeze List</button><button id="b7">Weekly Crossover</button></div>
+<div class="tabs"><button id="b1" class="on">Backtest</button><button id="b2">20/50 Crossover</button><button id="b3">Fund Portfolios</button><button id="b4">VTD 4H Buy</button><button id="b5">Monthly Supertrend</button><button id="b6">Squeeze List</button><button id="b7">Weekly Crossover</button><button id="b8">Target Compare</button></div>
 <div id="tab1">
 <h1>Quiet-then-Blast Backtest</h1>
 <p id="meta" class="n">Loading...</p>
@@ -283,9 +283,9 @@ Promise.all([fetch('data/supertrend_list.json').then(r=>{if(!r.ok)throw 0;return
 <h1>Squeeze List</h1>
 <p class="n" id="qm">Loading...</p>
 <p class="n">Every stock in the Squeeze tab of your Google Sheet. Click a stock name to open its chart in TradingView. The list refreshes every morning and with each Daily scan. <b>Price</b> is the last close from Angel One (updated after the market closes, not a live price). Stocks priced <b>above Rs 1000</b> are not listed; a stock comes back by itself when its price falls to Rs 1000 or less.</p>
-<p class="n"><b>Calculate</b> (manual, one stock at a time, last 10 years, prices from Angel One): the 20 EMA closes above the 50 EMA on a closed candle, the trade starts at the next candle's open and ends at +30% (target) or -20% from entry (stop), whichever the daily candles show first. After a +30% exit it also tells whether price later reached +70% (trail target hit) or fell to -20% first (stoploss hit). The next trade needs a fresh crossover after the previous trade has closed. If target and stop fall inside one daily candle, the stop is assumed first. <b>One click calculates both the weekly and the monthly chart and saves the result</b> (nothing is calculated twice): the <b>Weekly</b> and <b>Monthly</b> columns show win %, total trades and the highest / lowest peak gain of its trades (win % counts closed trades; a trade still open is in the total). The button turns into <b>Update</b> only after a new weekly or monthly candle has closed. The dropdown below only chooses which trade table "show" opens; it never changes the two columns.</p>
+<p class="n"><b>Calculate</b> (manual, one stock at a time, last 10 years, prices from Angel One): the 20 EMA closes above the 50 EMA on a closed candle, the trade starts at the next candle's open and ends at the <b>target</b> or at <b>-20% from entry (stop, always the same)</b>, whichever the daily candles show first. Every Calculate runs the weekly and the monthly chart with three targets: <b>30%</b>, <b>20%</b> and <b>10%</b>, and saves the result (nothing is calculated twice). A smaller target closes the trade earlier, so the next crossover can start a new trade: the trade counts differ. After a target exit it also tells whether price later reached +70% (trail target hit) or fell to -20% first (stoploss hit). If target and stop fall inside one daily candle, the stop is assumed first. Each cell shows: win % and total trades; <b>avg</b> = average P/L % of a closed trade and <b>total</b> = sum of the P/L % of the closed trades (a trade still open is counted in the trades but not in win % and P/L); highest / lowest peak gain of its trades. The button turns into <b>Update</b> after a new weekly or monthly candle has closed, or when the saved result is older than the 20% / 10% targets. The dropdowns only choose which trade table "show" opens; they never change the columns. The <b>Target Compare</b> tab puts all stocks and targets side by side.</p>
 <p class="n" id="sqs"></p>
-<input id="qq" placeholder="Search stock / company / industry" style="width:min(320px,100%)"> <select id="qi"><option value="">All industries</option></select> <label style="white-space:nowrap"><input type="checkbox" id="wo"> Watchlist only (<span id="wc">0</span>)</label> Trade table of: <select id="btf"><option value="W">Weekly</option><option value="M">Monthly</option></select>
+<input id="qq" placeholder="Search stock / company / industry" style="width:min(320px,100%)"> <select id="qi"><option value="">All industries</option></select> <label style="white-space:nowrap"><input type="checkbox" id="wo"> Watchlist only (<span id="wc">0</span>)</label> Trade table of: <select id="btf"><option value="W">Weekly</option><option value="M">Monthly</option></select> at target <select id="btt"><option value="30">30%</option><option value="20">20%</option><option value="10">10%</option></select>
 <div class="w"><table id="qt"></table></div>
 </div>
 <script>
@@ -304,16 +304,22 @@ function expKeys(){
  const d=new Date(Date.now()+5.5*36e5),dow=d.getUTCDay(),iso=d.toISOString().slice(0,10),mon=new Date(Date.parse(iso+'T00:00:00Z')-((dow+6)%7)*864e5);
  return {W:(dow==0||dow==6)?mon.toISOString().slice(0,10):new Date(mon-7*864e5).toISOString().slice(0,10),M:new Date(Date.UTC(+iso.slice(0,4),+iso.slice(5,7)-2,1)).toISOString().slice(0,7)};
 }
-const isCurrent=L=>{const e=expKeys();return !!(L&&L.keys&&L.keys.W>=e.W&&L.keys.M>=e.M)};
+const isCurrent=L=>{const e=expKeys();return !!(L&&L.alt&&L.keys&&L.keys.W>=e.W&&L.keys.M>=e.M)};   // a result saved before the 20% / 10% targets counts as out of date
 const lightOf=s=>ST.stocks[s]||(res[s]&&res[s].rec)||null;      // saved version, or the one just calculated if saving failed
-const view=(rec,t)=>{const x=rec[t]||{};return {tf:t,bars:x.bars,trades:x.trades||[],summary:x.summary,note:x.note,adjustments:rec.adjustments,firstDate:rec.firstDate,lastDate:rec.asOf}};
-function cell(L,t){
+const TT=()=>+$('btt').value;
+const pick=(o,t,g)=>g==30?o[t]:(o.alt&&o.alt[g]&&o.alt[g][t]);      // the weekly / monthly part of a result for target g (30 = main)
+const view=(rec,t)=>{const g=TT(),x=pick(rec,t,g)||{};return {tf:t,bars:x.bars,trades:x.trades||[],summary:x.summary,note:x.note||(!pick(rec,t,g)?'This result was saved before the 20% / 10% targets existed - press Update.':undefined),adjustments:rec.adjustments,firstDate:rec.firstDate,lastDate:rec.asOf}};
+const lite=d=>{const o=x=>({bars:x.bars,stats:x.stats,note:x.note}),alt={};for(const g of Object.keys(d.alt||{}))alt[g]={W:o(d.alt[g].W),M:o(d.alt[g].M)};return {savedAt:d.savedAt,asOf:d.asOf,keys:d.keys,W:o(d.W),M:o(d.M),alt:d.alt?alt:undefined}};
+const pl=n=>n==null?'-':`<span class="${cl(n)}">${sg(n)}%</span>`;
+function cell(L,t,g){
  if(!L)return '<span style="opacity:.5">-</span>';
- const x=L[t];if(!x)return '-';
+ const x=pick(L,t,g);
+ if(!x)return '<small style="opacity:.6">press Update to add</small>';
  if(!x.stats||!x.stats.trades)return '<span style="opacity:.6">0 trades</span>'+(x.note?'<br><small style="opacity:.7">not enough history</small>':'');
  const q=x.stats;
- return `<b>${q.winPct==null?'-':q.winPct+'%'}</b> win &middot; ${q.trades} trade${q.trades==1?'':'s'}<br><small>peak <span class="g">${sg(q.peakMax)}%</span> max / <span class="g">${sg(q.peakMin)}%</span> min</small>`;
+ return `<b>${q.winPct==null?'-':q.winPct+'%'}</b> win &middot; ${q.trades} trade${q.trades==1?'':'s'}<br><small>avg ${pl(q.avgPl)} &middot; total ${pl(q.sumPl)}</small><br><small>peak <span class="g">${sg(q.peakMax)}%</span> max / <span class="g">${sg(q.peakMin)}%</span> min</small>`;
 }
+const GRP=[['W',30],['W',20],['W',10],['M',30],['M',20],['M',10]];
 function detail(d){
  const u=d.tf=='M'?'months':'weeks';let h='';
  if(d.note)h+=`<p class="n">${esc(d.note)}</p>`;
@@ -327,8 +333,8 @@ function detail(d){
 }
 function draw(){
  const q=$('qq').value.toUpperCase(),ind=$('qi').value,f=R.filter(r=>(!ind||r.industry==ind)&&(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q)&&!(r.price>MAXP)&&(!$('wo').checked||WL.has(r.symbol))).sort((a,b)=>((a.price==null)-(b.price==null))||(a.price-b.price));   // price low to high, stocks without a price at the end
- const tip='Win % (closed trades) / total trades / highest and lowest peak gain of its trades';
- $('qt').innerHTML='<tr>'+['#','Stock','Company','Industry','Series','Price (last close)'].map(c=>`<th>${c}</th>`).join('')+`<th title="${tip}">Weekly<br><small style="font-weight:400">win % &middot; trades &middot; peak max/min</small></th><th title="${tip}">Monthly<br><small style="font-weight:400">win % &middot; trades &middot; peak max/min</small></th><th>Watch</th><th>Backtest</th></tr>`+
+ const tip='Win % and total trades / average and total P/L % of closed trades / highest and lowest peak gain of its trades';
+ $('qt').innerHTML='<tr>'+['#','Stock','Company','Industry','Series','Price (last close)'].map(c=>`<th>${c}</th>`).join('')+`${GRP.map(([t,g])=>`<th title="${tip}">${t=='W'?'Weekly':'Monthly'} ${g}%<br><small style="font-weight:400">win % &middot; trades<br>avg / total P/L<br>peak max / min</small></th>`).join('')}<th>Watch</th><th>Backtest</th></tr>`+
  (f.map((r,i)=>{
   const x=res[r.symbol]||{},saved=ST.stocks[r.symbol],L=lightOf(r.symbol),cur=isCurrent(saved);
   const label=x.loading?'Running...':saved?(cur?'Done &#10003;':'Update'):'Calculate',dis=busy||(saved&&cur&&!x.error);
@@ -336,10 +342,10 @@ function draw(){
   if(x.loading)st='Running... (can take 10-30 s)';
   else if(x.error)st=`<span class="r">${esc(x.error)}</span>`;
   else if(x.saveError)st=`<span class="r">Not saved: ${esc(x.saveError)}</span>`;
-  else if(saved)st=`saved ${esc((saved.savedAt||'').slice(0,10))}${cur?'':' - a new candle has closed'}`;
+  else if(saved)st=`saved ${esc((saved.savedAt||'').slice(0,10))}${cur?'':saved.alt?' - a new candle has closed':' - older result, Update adds the 20% / 10% targets'}`;
   if(L&&!x.loading&&!(x.rec&&x.show))st+=` <a href="#" class="sh">show</a>`;
-  return `<tr><td>${i+1}</td><td><a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+r.tv)}" target="_blank" rel="noopener">${esc(r.symbol)}</a></td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td><td>${esc(r.series)}</td><td style="text-align:right"${r.price_date?` title="Close of ${esc(r.price_date)}"`:''}>${r.price==null?'-':Number(r.price).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td>${cell(L,'W')}</td><td>${cell(L,'M')}</td><td style="text-align:center"><input type="checkbox" class="wl" data-s="${esc(r.symbol)}" title="Add to / remove from watchlist"${WL.has(r.symbol)?' checked':''}></td><td><button class="cb" data-s="${esc(r.symbol)}"${dis?' disabled':''}>${label}</button> <small>${st}</small></td></tr>`+
-  (x.rec&&x.show?`<tr class="dt" data-s="${esc(r.symbol)}"><td colspan="10">${detail(view(x.rec,TF()))}</td></tr>`:'')}).join('')||'<tr><td colspan="10">'+($('wo').checked?'Nothing in the watchlist yet - tick Watch on a stock.':'No stock matches.')+'</td></tr>');
+  return `<tr><td>${i+1}</td><td><a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+r.tv)}" target="_blank" rel="noopener">${esc(r.symbol)}</a></td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td><td>${esc(r.series)}</td><td style="text-align:right"${r.price_date?` title="Close of ${esc(r.price_date)}"`:''}>${r.price==null?'-':Number(r.price).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>${GRP.map(([t,g])=>`<td>${cell(L,t,g)}</td>`).join('')}<td style="text-align:center"><input type="checkbox" class="wl" data-s="${esc(r.symbol)}" title="Add to / remove from watchlist"${WL.has(r.symbol)?' checked':''}></td><td><button class="cb" data-s="${esc(r.symbol)}"${dis?' disabled':''}>${label}</button> <small>${st}</small></td></tr>`+
+  (x.rec&&x.show?`<tr class="dt" data-s="${esc(r.symbol)}"><td colspan="14">${detail(view(x.rec,TF()))}</td></tr>`:'')}).join('')||'<tr><td colspan="14">'+($('wo').checked?'Nothing in the watchlist yet - tick Watch on a stock.':'No stock matches.')+'</td></tr>');
  $('wc').textContent=WL.size;const hid=R.filter(r=>r.price>MAXP).length;$('qm').textContent=`${f.length} of ${R.length-hid} stocks shown (${hid} above Rs ${MAXP} are not listed). `+(PD?`Prices are the last close of ${PD}.`:'Prices appear after the next Daily scan or Refresh Squeeze list run.')+` ${Object.keys(ST.stocks).length} stocks calculated.`;
 }
 async function calc(s){
@@ -349,7 +355,7 @@ async function calc(s){
   let d;try{d=await r.json()}catch(e){throw new Error('API not reachable (HTTP '+r.status+') - Vercel setup problem')}
   if(!r.ok||d.error)throw new Error(d.error||'HTTP '+r.status);
   res[s]={rec:d,show:true,saveError:d.saved?null:(d.saveError||'not saved')};
-  if(d.saved)ST.stocks[s]={savedAt:d.savedAt,asOf:d.asOf,keys:d.keys,W:{bars:d.W.bars,stats:d.W.stats,note:d.W.note},M:{bars:d.M.bars,stats:d.M.stats,note:d.M.note}};
+  if(d.saved)ST.stocks[s]=lite(d);
  }catch(e){res[s]={error:e.message}}
  busy=null;draw();
 }
@@ -371,7 +377,7 @@ $('qt').onclick=e=>{
  if(h){e.preventDefault();res[h.closest('tr.dt').dataset.s].show=false;draw()}
  if(w){e.preventDefault();showSaved(w.closest('tr').querySelector('button.cb').dataset.s)}
 };
-$('qq').oninput=$('qi').onchange=$('btf').onchange=$('wo').onchange=draw;
+$('qq').oninput=$('qi').onchange=$('btf').onchange=$('btt').onchange=$('wo').onchange=draw;
 fetch('data/squeeze_list.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(k=>{R=k.stocks;PD=k.price_date||'';
  [...new Set(R.map(r=>r.industry).filter(Boolean))].sort().forEach(i=>{const o=document.createElement('option');o.value=o.textContent=i;$('qi').appendChild(o)});draw()})
 .catch(()=>$('qm').textContent='Not ready yet - run the Refresh Squeeze list workflow.');
@@ -409,11 +415,65 @@ fetch('data/weekly_cross_list.json').then(r=>{if(!r.ok)throw 0;return r.json()})
 .catch(()=>$('wm').textContent='Not ready yet - run the Daily scan workflow.');
 })();
 </script>
+<div id="tab8" hidden>
+<h1>Target Compare</h1>
+<p class="n" id="cmp">Loading...</p>
+<p class="n">The same trades rule run with a <b>30%</b>, <b>20%</b> and <b>10%</b> target (stop always -20% from entry), on the weekly and the monthly chart, for every stock you calculated in the Squeeze List (results are saved in the repo). <b>Win %</b> = closed trades that made money; <b>avg</b> = average P/L % of a closed trade; <b>total</b> = sum of the P/L % of all closed trades (a trade still open is left out). Only stocks calculated with the 20% / 10% targets are used here, so every target is compared on exactly the same stocks. A smaller target wins more often but each win is smaller, and it closes trades earlier so a stock gets more trades: compare <b>avg</b> (profit per trade) and <b>total</b> (profit overall) together with the win %.</p>
+<h2 style="margin:18px 0 6px;font-size:18px">All calculated stocks together</h2>
+<div class="w"><table id="cp"></table></div>
+<h2 style="margin:22px 0 6px;font-size:18px">Stock by stock</h2>
+<p class="n">The target with the highest <b>avg</b> P/L of that stock on that chart is highlighted. The number in brackets is the count of trades.</p>
+<input id="cq" placeholder="Search stock" style="width:min(240px,100%)">
+<div class="w"><table id="ct"></table></div>
+</div>
+<script>
+(()=>{
+const $=i=>document.getElementById(i);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sg=n=>(n>0?'+':'')+n,cl=n=>n>0?'g':n<0?'r':'';
+const pl=n=>n==null?'-':`<span class="${cl(n)}">${sg(n)}%</span>`;
+const GS=[30,20,10],TFS=[['W','Weekly'],['M','Monthly']];
+let ST=null,msg='';
+const pick=(o,t,g)=>g==30?o[t]:(o.alt&&o.alt[g]&&o.alt[g][t]);
+function draw(){
+ if(!ST){$('cmp').innerHTML=msg||'Loading...';return}
+ const all=Object.entries(ST),ok=all.filter(([k,v])=>v.alt),old=all.length-ok.length;
+ $('cmp').textContent=`${ok.length} stocks calculated with all three targets${old?` (${old} saved earlier need Update in the Squeeze List first)`:''}.`;
+ if(!ok.length){$('cp').innerHTML='';$('ct').innerHTML='<tr><td>Nothing to compare yet - press Calculate (or Update) on some stocks in the Squeeze List.</td></tr>';return}
+ // pooled: every closed trade of every stock counts once
+ $('cp').innerHTML='<tr><th>Chart</th><th>Target</th><th>Stocks with trades</th><th>Closed trades</th><th>Trades per stock</th><th>Win %</th><th>Avg P/L per trade</th><th>Total P/L (sum of trades)</th></tr>'+
+  TFS.map(([t,name])=>{
+   const rows=GS.map(g=>{let n=0,tr=0,cr=0,w=0,sum=0;
+    for(const [k,v] of ok){const q=(pick(v,t,g)||{}).stats;if(!q||!q.trades)continue;n++;tr+=q.trades;cr+=q.closed||0;w+=q.wins||0;sum+=q.sumPl||0}
+    return {g,n,tr,cr,win:cr?+(w/cr*100).toFixed(1):null,avg:cr?+(sum/cr).toFixed(2):null,sum:+sum.toFixed(1)}});
+   const best=Math.max(...rows.map(r=>r.avg==null?-1e9:r.avg));
+   return rows.map((r,i)=>`<tr${r.avg!=null&&r.avg===best?' class="cm"':''}>${i?'':`<td rowspan="3"><b>${name}</b></td>`}<td>${r.g}%</td><td>${r.n}</td><td>${r.cr}</td><td>${ok.length?(r.tr/ok.length).toFixed(1):'-'}</td><td>${r.win==null?'-':r.win+'%'}</td><td>${pl(r.avg)}</td><td>${r.cr?pl(r.sum):'-'}</td></tr>`).join('')}).join('');
+ const q=$('cq').value.toUpperCase(),f=ok.filter(([k])=>k.includes(q)).sort((a,b)=>a[0]<b[0]?-1:1);
+ const ths=TFS.map(([t,name])=>`<th colspan="6">${name}</th>`).join('');
+ const sub=TFS.map(()=>GS.map(g=>`<th>${g}% win</th><th>${g}% avg</th>`).join('')).join('');
+ $('ct').innerHTML=`<tr><th rowspan="2">Stock</th>${ths}</tr><tr>${sub}</tr>`+(f.map(([k,v])=>{
+  const cells=TFS.map(([t])=>{
+   const av=GS.map(g=>{const s=(pick(v,t,g)||{}).stats;return s&&s.avgPl!=null?s.avgPl:null}),best=Math.max(...av.map(x=>x==null?-1e9:x));
+   return GS.map((g,i)=>{const s=(pick(v,t,g)||{}).stats;
+    if(!s||!s.trades)return '<td>-</td><td>-</td>';
+    const hi=av[i]!=null&&av[i]===best?' class="cm"':'';
+    return `<td${hi}>${s.winPct==null?'-':s.winPct+'%'} <small>(${s.trades})</small></td><td${hi}>${pl(s.avgPl)}</td>`}).join('')}).join('');
+  return `<tr><td><a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+k.replace(/[&-]/g,'_'))}" target="_blank" rel="noopener">${esc(k)}</a></td>${cells}</tr>`}).join('')||'<tr><td colspan="13">No stock matches.</td></tr>');
+}
+$('cq').oninput=draw;
+fetch('/api/results').then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{
+ if(d.configured===false)msg='<span class="r">Saving is not set up yet</span> - nothing is saved, so there is nothing to compare. Add GH_TOKEN in Vercel (see the Squeeze List page).';
+ else if(!ok||d.error)msg='<span class="r">Could not load the saved results:</span> '+esc(d.error||'error');
+ else ST=d.stocks||{};
+ draw();
+}).catch(()=>{msg='<span class="r">Saved results not available</span> (the API is not reachable here).';draw()});
+})();
+</script>
 <script>
 (()=>{const $=i=>document.getElementById(i);
-const show=n=>{[1,2,3,4,5,6,7].forEach(i=>{const t=$('tab'+i),b=$('b'+i);if(t)t.hidden=i!=n;if(b)b.className=i==n?'on':''});history.replaceState(null,'',['','#backtest','#crossover','#funds','#vtd','#supertrend','#squeeze','#weekly'][n])};
-[1,2,3,4,5,6,7].forEach(i=>$('b'+i).onclick=()=>show(i));
-show({'#crossover':2,'#funds':3,'#vtd':4,'#supertrend':5,'#squeeze':6,'#weekly':7}[location.hash]||1);
+const show=n=>{[1,2,3,4,5,6,7,8].forEach(i=>{const t=$('tab'+i),b=$('b'+i);if(t)t.hidden=i!=n;if(b)b.className=i==n?'on':''});history.replaceState(null,'',['','#backtest','#crossover','#funds','#vtd','#supertrend','#squeeze','#weekly','#compare'][n])};
+[1,2,3,4,5,6,7,8].forEach(i=>$('b'+i).onclick=()=>show(i));
+show({'#crossover':2,'#funds':3,'#vtd':4,'#supertrend':5,'#squeeze':6,'#weekly':7,'#compare':8}[location.hash]||1);
 })();
 </script>
 </body></html>

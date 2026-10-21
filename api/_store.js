@@ -70,7 +70,9 @@ async function write(path, change, message) {
 // the light version of a saved result: what the dashboard needs to fill the columns and to know if it is out of date
 function light(rec) {
   const one = (x) => ({ bars: x.bars, stats: x.stats, note: x.note });
-  return { savedAt: rec.savedAt, asOf: rec.asOf, keys: rec.keys, W: one(rec.W), M: one(rec.M) };
+  const alt = {};
+  for (const t of Object.keys(rec.alt || {})) alt[t] = { W: one(rec.alt[t].W), M: one(rec.alt[t].M) };
+  return { savedAt: rec.savedAt, asOf: rec.asOf, keys: rec.keys, W: one(rec.W), M: one(rec.M), alt: rec.alt ? alt : undefined };
 }
 
 async function save(symbol, record) {

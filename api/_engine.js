@@ -82,18 +82,18 @@ function ema(values, span) {
 }
 
 // walks daily candles from the entry day; returns where the trade ended
-function simulate(daily, k0, entry) {
-  const stop = entry * (1 - STOP_PCT), target = entry * (1 + TARGET_PCT);
+function simulate(daily, k0, entry, tg = TARGET_PCT) {
+  const stop = entry * (1 - STOP_PCT), target = entry * (1 + tg), lab = `Target +${Math.round(tg * 100)}%`;
   for (let k = k0; k < daily.length; k++) {
     const c = daily[k];
     if (k > k0) {
       if (c.open <= stop) return { k, price: c.open, reason: "Stop -20% (gap)" };
-      if (c.open >= target) return { k, price: c.open, reason: "Target +30% (gap)" };
+      if (c.open >= target) return { k, price: c.open, reason: lab + " (gap)" };
     }
     const hitStop = c.low <= stop, hitTarget = c.high >= target;
     if (hitStop && hitTarget) return { k, price: stop, reason: "Stop -20% (same day as target)" };
     if (hitStop) return { k, price: stop, reason: "Stop -20%" };
-    if (hitTarget) return { k, price: target, reason: "Target +30%" };
+    if (hitTarget) return { k, price: target, reason: lab };
   }
   return null;
 }
@@ -132,7 +132,7 @@ function runBacktest(daily, tf, opts = {}) {
     const eb = bars[i + 1];
     if (!eb) break;                                            // signal on the last bar, entry bar has not started yet
     const k0 = eb.d0, entry = daily[k0].open;
-    let x = simulate(daily, k0, entry), open = false;
+    let x = simulate(daily, k0, entry, opts.target || TARGET_PCT), open = false;
     if (!x) { x = { k: daily.length - 1, price: daily[daily.length - 1].close, reason: "Open (marked at last close)" }; open = true; }
 
     let peak = 0;
@@ -182,12 +182,17 @@ function summarize(trades) {
 // the four numbers shown in the Weekly / Monthly columns of the Squeeze List: trades (all, a still open one included),
 // win % (closed trades only), highest and lowest peak gain % of the trades
 function stats(trades) {
-  if (!trades.length) return { trades: 0, winPct: null, peakMax: null, peakMin: null };
+  const none = { trades: 0, closed: 0, wins: 0, winPct: null, avgPl: null, sumPl: null, peakMax: null, peakMin: null };
+  if (!trades.length) return none;
   const closed = trades.filter((t) => !t.reason.startsWith("Open"));
   const peaks = trades.map((t) => t.peakGainPct);
+  const wins = closed.filter((t) => t.plPct > 0).length, sum = closed.reduce((a, t) => a + t.plPct, 0);
   return {
-    trades: trades.length,
-    winPct: closed.length ? +((closed.filter((t) => t.plPct > 0).length / closed.length) * 100).toFixed(1) : null,
+    trades: trades.length,                                  // all trades, a still open one included
+    closed: closed.length, wins,                            // win % and the P/L numbers use closed trades only
+    winPct: closed.length ? +((wins / closed.length) * 100).toFixed(1) : null,
+    avgPl: closed.length ? +(sum / closed.length).toFixed(2) : null,     // average P/L % per closed trade
+    sumPl: closed.length ? +sum.toFixed(1) : null,                       // total of the P/L % of the closed trades
     peakMax: Math.max(...peaks),
     peakMin: Math.min(...peaks),
   };

@@ -33,18 +33,35 @@ JS = """
 const fs=require('fs'),E=require(process.argv[1]+'/api/_engine.js');
 const a=JSON.parse(fs.readFileSync(process.argv[2]));
 const f=E.fixSplits(a.daily);
-const r=E.runBacktest(f.rows,a.tf,{today:a.today,from:a.from});
+const r=E.runBacktest(f.rows,a.tf,{today:a.today,from:a.from,target:a.target});
 console.log(JSON.stringify({trades:r.trades,notes:f.notes}));
 """
 
 
-def compare(name, daily, tf, today, from_date=None):
+def brute_force(rows, trades, target):
+    """Re-derives every trade's exit by scanning the raw daily candles day by day (no weekly logic): first touch of -20% or +target."""
+    by = {r["date"]: r for r in rows}; days = sorted(by); good = True
+    for t in trades:
+        e = by[t["entryDate"]]["open"]; st, tg = e * 0.8, e * (1 + target); hit = None
+        for d in days:
+            if d < t["entryDate"]: continue
+            c = by[d]
+            if d > t["entryDate"] and c["open"] <= st: hit = (d, c["open"]); break
+            if d > t["entryDate"] and c["open"] >= tg: hit = (d, c["open"]); break
+            if c["low"] <= st: hit = (d, st); break
+            if c["high"] >= tg: hit = (d, tg); break
+        ok = (hit is None and t["reason"].startswith("Open")) or (hit is not None and hit[0] == t["exitDate"] and abs(hit[1] - t["exitPrice"]) < 0.011)
+        if not ok: print(f"   BRUTE-FORCE MISMATCH trade {t['trade']} {t['entryDate']}: {hit} vs {t['exitDate']} {t['exitPrice']} {t['reason']}"); good = False
+    return good
+
+
+def compare(name, daily, tf, today, from_date=None, target=0.30):
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
-        json.dump(dict(daily=daily, tf=tf, today=today, **({"from": from_date} if from_date else {})), fh)
+        json.dump(dict(daily=daily, tf=tf, today=today, target=target, **({"from": from_date} if from_date else {})), fh)
     js = json.loads(subprocess.run(["node", "-e", JS, ROOT, fh.name], capture_output=True, text=True, check=True).stdout)
     os.unlink(fh.name)
     rows, notes = py.fix_splits(daily)
-    mine = py.run_backtest(rows, tf, today, from_date)
+    mine = py.run_backtest(rows, tf, today, from_date, target)
     ok = notes == js["notes"] and len(mine) == len(js["trades"])
     for a, b in zip(mine, js["trades"]):
         for key, v in a.items():
@@ -56,6 +73,7 @@ def compare(name, daily, tf, today, from_date=None):
     kinds = {}
     for t in mine:
         kinds[t["reason"]] = kinds.get(t["reason"], 0) + 1
+    ok = ok and brute_force(rows, mine, target)
     print(f"{'PASS' if ok else 'FAIL'}  {name}: {len(mine)} trades (js {len(js['trades'])}), split fixes {len(notes)}, {kinds}")
     return ok
 
@@ -63,9 +81,11 @@ def compare(name, daily, tf, today, from_date=None):
 if __name__ == "__main__":
     allok = True
     sunday = dict(date="2026-10-18", dow=0, minutes=0)
-    for seed in (1, 2, 3, 4, 5, 6):
-        allok &= compare(f"weekly seed {seed}", synth(seed), "W", sunday, "2016-10-18")
-    allok &= compare("monthly seed 7", synth(7), "M", sunday)
+    for target in (0.30, 0.20, 0.10):
+        for seed in (1, 2, 3, 4, 5, 6):
+            allok &= compare(f"weekly seed {seed} target {round(target*100)}%", synth(seed), "W", sunday, "2016-10-18", target)
+    for target in (0.30, 0.20, 0.10):
+        allok &= compare(f"monthly seed 7 target {round(target*100)}%", synth(7), "M", sunday, None, target)
     # mid-week: the running week must not give a signal, but an entry on its Monday open must still be tracked
     d = synth(8)
     wed = [r for r in d if r["date"] <= "2026-10-14"]
