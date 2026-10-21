@@ -282,7 +282,7 @@ Promise.all([fetch('data/supertrend_list.json').then(r=>{if(!r.ok)throw 0;return
 <div id="tab6" hidden>
 <h1>Squeeze List</h1>
 <p class="n" id="qm">Loading...</p>
-<p class="n">Every stock in the Squeeze tab of your Google Sheet. Click a stock name to open its chart in TradingView. The list refreshes every morning and with each Daily scan. <b>Price</b> is the last close from Angel One (updated after the market closes, not a live price).</p>
+<p class="n">Every stock in the Squeeze tab of your Google Sheet. Click a stock name to open its chart in TradingView. The list refreshes every morning and with each Daily scan. <b>Price</b> is the last close from Angel One (updated after the market closes, not a live price). Stocks priced <b>above Rs 1000</b> are not listed; a stock comes back by itself when its price falls to Rs 1000 or less.</p>
 <p class="n"><b>Calculate</b> (manual, one stock at a time, last 10 years, prices from Angel One): the 20 EMA closes above the 50 EMA on a closed candle, the trade starts at the next candle's open and ends at +30% (target) or -20% from entry (stop), whichever the daily candles show first. After a +30% exit it also tells whether price later reached +70% (trail target hit) or fell to -20% first (stoploss hit). The next trade needs a fresh crossover after the previous trade has closed. If target and stop fall inside one daily candle, the stop is assumed first. <b>One click calculates both the weekly and the monthly chart and saves the result</b> (nothing is calculated twice): the <b>Weekly</b> and <b>Monthly</b> columns show win %, total trades and the highest / lowest peak gain of its trades (win % counts closed trades; a trade still open is in the total). The button turns into <b>Update</b> only after a new weekly or monthly candle has closed. The dropdown below only chooses which trade table "show" opens; it never changes the two columns.</p>
 <p class="n" id="sqs"></p>
 <input id="qq" placeholder="Search stock / company / industry" style="width:min(320px,100%)"> <select id="qi"><option value="">All industries</option></select> <label style="white-space:nowrap"><input type="checkbox" id="wo"> Watchlist only (<span id="wc">0</span>)</label> Trade table of: <select id="btf"><option value="W">Weekly</option><option value="M">Monthly</option></select>
@@ -292,7 +292,7 @@ Promise.all([fetch('data/supertrend_list.json').then(r=>{if(!r.ok)throw 0;return
 (()=>{
 const $=i=>document.getElementById(i);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let R=[],PD='';
+let R=[],PD='';const MAXP=1000;   // stocks whose last close is above this (Rs) are not listed; stocks without a price yet stay
 let WL=new Set();try{WL=new Set(JSON.parse(localStorage.getItem('sqWatch')||'[]'))}catch(e){}   // watchlist: kept in this browser until you untick it yourself
 const saveWL=()=>{try{localStorage.setItem('sqWatch',JSON.stringify([...WL]))}catch(e){}};
 const res={};            // symbol -> {loading} | {error} | {rec, show, saveError}   rec = the whole result of one calculation (weekly + monthly)
@@ -326,7 +326,7 @@ function detail(d){
  return h+'<p><a href="#" class="hd">Hide</a></p>';
 }
 function draw(){
- const q=$('qq').value.toUpperCase(),ind=$('qi').value,f=R.filter(r=>(!ind||r.industry==ind)&&(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q)&&(!$('wo').checked||WL.has(r.symbol))).sort((a,b)=>((a.price==null)-(b.price==null))||(a.price-b.price));   // price low to high, stocks without a price at the end
+ const q=$('qq').value.toUpperCase(),ind=$('qi').value,f=R.filter(r=>(!ind||r.industry==ind)&&(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q)&&!(r.price>MAXP)&&(!$('wo').checked||WL.has(r.symbol))).sort((a,b)=>((a.price==null)-(b.price==null))||(a.price-b.price));   // price low to high, stocks without a price at the end
  const tip='Win % (closed trades) / total trades / highest and lowest peak gain of its trades';
  $('qt').innerHTML='<tr>'+['#','Stock','Company','Industry','Series','Price (last close)'].map(c=>`<th>${c}</th>`).join('')+`<th title="${tip}">Weekly<br><small style="font-weight:400">win % &middot; trades &middot; peak max/min</small></th><th title="${tip}">Monthly<br><small style="font-weight:400">win % &middot; trades &middot; peak max/min</small></th><th>Watch</th><th>Backtest</th></tr>`+
  (f.map((r,i)=>{
@@ -340,7 +340,7 @@ function draw(){
   if(L&&!x.loading&&!(x.rec&&x.show))st+=` <a href="#" class="sh">show</a>`;
   return `<tr><td>${i+1}</td><td><a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+r.tv)}" target="_blank" rel="noopener">${esc(r.symbol)}</a></td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td><td>${esc(r.series)}</td><td style="text-align:right"${r.price_date?` title="Close of ${esc(r.price_date)}"`:''}>${r.price==null?'-':Number(r.price).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td>${cell(L,'W')}</td><td>${cell(L,'M')}</td><td style="text-align:center"><input type="checkbox" class="wl" data-s="${esc(r.symbol)}" title="Add to / remove from watchlist"${WL.has(r.symbol)?' checked':''}></td><td><button class="cb" data-s="${esc(r.symbol)}"${dis?' disabled':''}>${label}</button> <small>${st}</small></td></tr>`+
   (x.rec&&x.show?`<tr class="dt" data-s="${esc(r.symbol)}"><td colspan="10">${detail(view(x.rec,TF()))}</td></tr>`:'')}).join('')||'<tr><td colspan="10">'+($('wo').checked?'Nothing in the watchlist yet - tick Watch on a stock.':'No stock matches.')+'</td></tr>');
- $('wc').textContent=WL.size;$('qm').textContent=`${f.length} of ${R.length} stocks shown. `+(PD?`Prices are the last close of ${PD}.`:'Prices appear after the next Daily scan or Refresh Squeeze list run.')+` ${Object.keys(ST.stocks).length} stocks calculated.`;
+ $('wc').textContent=WL.size;const hid=R.filter(r=>r.price>MAXP).length;$('qm').textContent=`${f.length} of ${R.length-hid} stocks shown (${hid} above Rs ${MAXP} are not listed). `+(PD?`Prices are the last close of ${PD}.`:'Prices appear after the next Daily scan or Refresh Squeeze list run.')+` ${Object.keys(ST.stocks).length} stocks calculated.`;
 }
 async function calc(s){
  if(busy)return;busy=s;res[s]={loading:true};draw();
