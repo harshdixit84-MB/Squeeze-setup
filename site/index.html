@@ -23,7 +23,7 @@ tr.cm td{background:#fde68a33}.up{color:#16a34a}.dn{color:#dc2626}.nw{color:#256
 .chip.on{opacity:1;background:#dbeafe;border-color:#2563eb;font-weight:600}.chip .x{width:20px;height:20px;line-height:19px;text-align:center;border-radius:50%;font-size:15px}.chip .x:hover{background:#fecaca;color:#b91c1c}
 .fs{grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr))!important}table.sm{font-size:12px}table.sm td,table.sm th{padding:3px 6px}
 </style></head><body>
-<div class="tabs"><button id="b1" class="on">Backtest</button><button id="b2">20/50 Crossover</button><button id="b3">Fund Portfolios</button><button id="b4">VTD 4H Buy</button><button id="b5">Monthly Supertrend</button><button id="b6">Squeeze List</button><button id="b7">Weekly Crossover</button><button id="b8">Target Compare</button></div>
+<div class="tabs"><button id="b1" class="on">Backtest</button><button id="b3">Fund Portfolios</button><button id="b4">VTD 4H Buy</button><button id="b6">Squeeze List</button><button id="b7">Weekly Crossover</button><button id="b8">Target Compare</button></div>
 <div id="tab1">
 <h1>Quiet-then-Blast Backtest</h1>
 <p id="meta" class="n">Loading...</p>
@@ -71,40 +71,6 @@ const dr=()=>tbl('c2',[['Stock',r=>tv(r.stock)],['Entry date',r=>r.entry_date],[
 $('cs').onchange=dr;dr()}).catch(()=>{});
 </script>
 </div>
-<div id="tab2" hidden>
-<h1>20/50 EMA Crossover - monthly</h1>
-<p class="n" id="xm">Loading...</p>
-<p class="n"><b>Rule (monthly chart):</b> the 20-month average (EMA) closed above the 50-month average in the last fully closed month, after being at or below it the month before, and that month's candle was green (close higher than open). The month that is still running is not counted. Stocks come from the Squeeze tab of your Google Sheet. <b>New ones are added in the first scan after a month ends and stay here until you delete them.</b> Prices, "since crossover" and the latest-day change refresh every trading day. Click a stock name to open its chart in TradingView.</p>
-<input id="xq" placeholder="Search stock / company / industry" style="width:min(320px,100%)"> <button id="xd" disabled>Delete selected</button>
-<div class="w"><table id="xt"></table></div>
-</div>
-<script>
-(()=>{
-const $=i=>document.getElementById(i),REPO='harshdixit84-MB/Squeeze-setup';
-let rows=[],hid=new Set(),sel=new Set(),dd='';
-try{hid=new Set(JSON.parse(localStorage.getItem('xhide')||'[]'))}catch(e){}
-const save=()=>{try{localStorage.setItem('xhide',JSON.stringify([...hid]))}catch(e){}};
-const key=r=>r.symbol+'|'+r.signal_date,cl=v=>v>0?'g':v<0?'r':'';
-const fd=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'-';
-const sg=v=>v==null?'-':(v>0?'+':'')+v+'%';
-function draw(){
- const q=$('xq').value.toUpperCase(),f=rows.filter(r=>!hid.has(key(r))&&(r.symbol+' '+r.company+' '+r.industry).toUpperCase().includes(q));
- $('xt').innerHTML='<tr><th><input type="checkbox" id="xa" title="Select all shown"></th>'+['Stock','Company','Industry','Crossed in month','Month close','Latest close','Since crossover','Latest day','20M EMA','50M EMA','Month volume vs 6-mo avg','20 above 50 now'].map(c=>`<th>${c}</th>`).join('')+'</tr>'+
- f.map(r=>`<tr><td><input type="checkbox" class="xc" data-k="${key(r)}" ${sel.has(key(r))?'checked':''}></td><td>${tv(r.symbol,r.tv)}${r.signal_date==dd?' <span class="nw">NEW</span>':''}</td><td>${r.company||''}</td><td>${r.industry||''}</td><td>${fd(r.signal_date)}</td><td>${r.signal_close}</td><td>${r.last_close??'-'}</td><td class="${cl(r.since_pct)}">${sg(r.since_pct)}</td><td class="${cl(r.day_pct)}">${sg(r.day_pct)}</td><td>${r.ema20??'-'}</td><td>${r.ema50??'-'}</td><td>${r.signal_volx==null?'-':r.signal_volx+'x'}</td><td class="${r.above?'g':'r'}">${r.above?'Yes':'No'}</td></tr>`).join('')||'<tr><td colspan="13">No stocks in the list.</td></tr>';
- document.querySelectorAll('.xc').forEach(el=>el.onchange=()=>{el.checked?sel.add(el.dataset.k):sel.delete(el.dataset.k);btn()});
- $('xa').onchange=e=>{document.querySelectorAll('.xc').forEach(el=>{el.checked=e.target.checked;e.target.checked?sel.add(el.dataset.k):sel.delete(el.dataset.k)});btn()};btn()}
-function btn(){const n=[...sel].filter(k=>rows.some(r=>key(r)==k&&!hid.has(k))).length;$('xd').disabled=!n;$('xd').textContent=n?`Delete selected (${n})`:'Delete selected'}
-$('xq').oninput=draw;
-$('xd').onclick=()=>{const ks=[...sel].filter(k=>rows.some(r=>key(r)==k)),sy=ks.map(k=>k.split('|')[0]);if(!ks.length)return;
- if(!confirm('Delete '+sy.join(', ')+' from the list?\n\nThey disappear from this page now. A GitHub issue then opens - press Submit new issue so the delete also holds on your other devices.'))return;
- ks.forEach(k=>hid.add(k));sel.clear();save();draw();
- window.open(`https://github.com/${REPO}/issues/new?title=${encodeURIComponent('Remove crossover: '+sy.join(', '))}`,'_blank','noopener')};
-fetch('data/ema_cross_list.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(k=>{rows=k.stocks;dd=k.latest_signal;
- const cur=new Set(rows.map(key));hid=new Set([...hid].filter(x=>cur.has(x)));save();                      // forget deletes the server has already applied
- $('xm').textContent=k.timeframe!='monthly'?'Monthly list not built yet - run the Daily scan workflow.':`${rows.length} stocks in the list. Latest closed month checked: ${k.latest_month?new Date(k.latest_month+'-01T00:00:00').toLocaleDateString('en-GB',{month:'long',year:'numeric'}):'-'}; prices up to ${k.data_date}; ${k.stocks_scanned} stocks scanned (need 52+ months of history); ${k.new_today||0} new on the latest scan. Updated ${k.updated}.`;draw()})
-.catch(()=>$('xm').textContent='Not ready yet - run the Daily scan workflow.');
-})();
-</script>
 <div id="tab3" hidden>
 <h1>Mutual Fund Portfolios</h1>
 <p class="n" id="fm0">Loading...</p>
@@ -190,93 +156,6 @@ fetch('data/vtd_list.json').then(r=>{if(!r.ok)throw 0;return r.json()}).then(k=>
  const open=rows.filter(r=>r.status=='OPEN').length;
  $('vm').textContent=k.data_time?`${rows.length} stocks in the list (${open} trades still open). Last 4-hour candle used: ${fd(k.data_time)}; ${k.stocks_scanned} stocks scanned; ${k.new_count||0} new on the latest scan. Updated ${k.updated}.`:'No scan has run yet - the first one runs after the next 4-hour candle closes, or run the "VTD 4H scan" workflow.';draw()})
 .catch(()=>$('vm').textContent='Not ready yet - run the VTD 4H scan workflow.');
-})();
-</script>
-<div id="tab5" hidden>
-<h1>Monthly Supertrend</h1>
-<p class="n" id="sm">Loading...</p>
-<p class="n"><b>Rule:</b> on the monthly chart the Supertrend (10, 3) changed colour on the last closed month. <b>Green</b> list: it turned green and that month's candle is not a hammer and has no long upper wick. <b>Red</b> list: the mirror image (not a shooting star, no long lower wick). Stocks come from the Squeeze tab of your Google Sheet, prices from Angel One. <b>SP pullback:</b> stocks from the green / red lists whose trend is still the same colour and whose price has come back to within 3% of the Supertrend line (green: price above the line; red: price below it). They leave this view when the price moves more than 3% away. <b>Stocks stay in the green / red lists until you delete them or tick Buy.</b> Click a stock name to open its monthly chart in TradingView.</p>
-<select id="ss"><option value="green">Supertrend turned GREEN</option><option value="red">Supertrend turned RED</option><option value="pullback">SP pullback</option></select>
-<input id="sq" placeholder="Search stock / company / industry" style="width:min(320px,100%)"> <button id="sd" disabled>Delete selected</button>
-<div class="w"><table id="st"></table></div>
-<h2>My trades (bought from this list)</h2>
-<p class="n" id="pm"></p>
-<div class="w"><table id="pt"></table></div>
-<h2>Closed trades</h2>
-<div class="w"><table id="pc"></table></div>
-</div>
-<script>
-(()=>{
-const $=i=>document.getElementById(i),REPO='harshdixit84-MB/Squeeze-setup';
-let L={stocks:[]},P={open:[],closed:[]},hid=new Set(),sel=new Set(),pb=[],ps=[],pr=new Set();
-const ls=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??d}catch(e){return d}},sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-hid=new Set(ls('sthide',[]));pb=ls('stbuy',[]);ps=ls('stsell',[]);pr=new Set(ls('strem',[]));
-const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const key=r=>r.symbol+'|'+r.side+'@'+r.signal_date,cl=v=>v>0?'g':v<0?'r':'';
-const fd=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'-';
-const sg=v=>v==null?'-':(v>0?'+':'')+v.toFixed(2);
-const inr=v=>(v<0?'-':'')+'Rs '+Math.abs(v).toLocaleString('en-IN',{maximumFractionDigits:2,minimumFractionDigits:2});
-const today=()=>new Date().toISOString().slice(0,10);
-const link=r=>`<a class="tk" href="https://www.tradingview.com/chart/?symbol=${encodeURIComponent('NSE:'+r.tv)}&interval=1M" target="_blank" rel="noopener">${esc(r.symbol)}</a>`;
-const issue=t=>window.open(`https://github.com/${REPO}/issues/new?title=${encodeURIComponent(t)}`,'_blank','noopener');
-function visibleOpen(){ // server positions + buys not yet applied by the server
- const o=P.open.map(p=>({...p}));
- pb=pb.filter(b=>!P.open.concat(P.closed).some(p=>p.symbol==b.symbol&&p.signal_date==b.signal_date));
- pb.forEach(b=>o.push({symbol:b.symbol,tv:b.tv,side:b.side,signal_date:b.signal_date,buy_date:b.buy_date,buy_price:b.price,qty:b.qty,last_close:b.last,pending:true}));
- ps=ps.filter(x=>!P.closed.some(p=>p.symbol==x.symbol&&p.buy_date==x.buy_date));
- return o.filter(p=>!ps.some(x=>x.symbol==p.symbol&&x.buy_date==p.buy_date)&&!pr.has(p.symbol+'@'+p.buy_date));
-}
-function visibleClosed(){
- const c=P.closed.map(p=>({...p}));
- ps.forEach(x=>{const o=P.open.find(p=>p.symbol==x.symbol&&p.buy_date==x.buy_date)||pb.find(b=>b.symbol==x.symbol&&b.buy_date==x.buy_date);
-  if(o)c.unshift({symbol:o.symbol,tv:o.tv,buy_date:o.buy_date,buy_price:o.buy_price??o.price,qty:o.qty,sell_price:x.price,sell_date:x.date,pending:true})});
- return c.filter(p=>!pr.has(p.symbol+'@'+p.buy_date));
-}
-function draw(){
- const q=$('sq').value.toUpperCase(),sd=$('ss').value;
- const pbk=sd=='pullback',f=L.stocks.filter(r=>(pbk?r.pullback:r.side==sd)&&!hid.has(key(r))&&!pb.some(b=>b.symbol==r.symbol&&b.signal_date==r.signal_date)&&(r.symbol+' '+(r.company||'')+' '+(r.industry||'')).toUpperCase().includes(q));
- $('st').innerHTML='<tr><th><input type="checkbox" id="sa" title="Select all shown"></th>'+['Stock','Company','Industry'].concat(pbk?['Trend'] :[],[pbk?'Supertrend turned on':'Supertrend turned '+sd+' on','Current price','SP line','Gap to SP line','52W high','52W low','Since then','Supertrend now','Buy']).map(c=>`<th>${c}</th>`).join('')+'</tr>'+
- (f.map(r=>`<tr><td><input type="checkbox" class="sc" data-k="${esc(key(r))}" ${sel.has(key(r))?'checked':''}></td><td>${link(r)}</td><td>${esc(r.company)}</td><td>${esc(r.industry)}</td>${pbk?`<td class="${r.side=='green'?'g':'r'}">${r.side}</td>`:''}<td>${fd(r.signal_date)}</td><td>${r.last_close??'-'}</td><td>${r.st_line??'-'}</td><td>${r.gap_pct==null?'-':r.gap_pct.toFixed(2)+'%'}</td><td>${r.high52??'-'}</td><td>${r.low52??'-'}</td><td class="${cl(r.since_pct)}">${r.since_pct==null?'-':sg(r.since_pct)+'%'}</td><td class="${r.st_now=='green'?'g':'r'}">${r.st_now||'-'}</td><td><input type="checkbox" class="sb" data-k="${esc(key(r))}" title="Mark as bought"></td></tr>`).join('')||`<tr><td colspan="14">${pbk?'No stock is within 3% of its Supertrend line right now.':'No '+sd+' stocks in the list right now.'}</td></tr>`);
- document.querySelectorAll('.sc').forEach(el=>el.onchange=()=>{el.checked?sel.add(el.dataset.k):sel.delete(el.dataset.k);btn()});
- $('sa').onchange=e=>{document.querySelectorAll('.sc').forEach(el=>{el.checked=e.target.checked;e.target.checked?sel.add(el.dataset.k):sel.delete(el.dataset.k)});btn()};
- document.querySelectorAll('.sb').forEach(el=>el.onchange=()=>buy(el));
- btn();drawPos();
-}
-function btn(){const n=[...sel].filter(k=>L.stocks.some(r=>key(r)==k&&!hid.has(k))).length;$('sd').disabled=!n;$('sd').textContent=n?`Delete selected (${n})`:'Delete selected'}
-function buy(el){
- const r=L.stocks.find(x=>key(x)==el.dataset.k);if(!r){el.checked=false;return}
- const pxs=prompt('Buy '+r.symbol+' - price per share (Rs):',r.last_close);if(pxs===null){el.checked=false;return}
- const px=parseFloat(pxs);if(!(px>0)){alert('Enter a price above 0.');el.checked=false;return}
- const qs=prompt('Quantity (shares):','1');if(qs===null){el.checked=false;return}
- const qty=parseInt(qs,10);if(!(qty>0)){alert('Enter a quantity above 0.');el.checked=false;return}
- pb.push({symbol:r.symbol,tv:r.tv,side:r.side,signal_date:r.signal_date,price:px,qty,last:r.last_close,buy_date:today()});sv('stbuy',pb);draw();
- issue(`Buy Supertrend: ${r.symbol}|${r.side}@${r.signal_date}@${px}@${qty}`);
-}
-$('sq').oninput=$('ss').onchange=draw;
-$('sd').onclick=()=>{const ks=[...sel].filter(k=>L.stocks.some(r=>key(r)==k));if(!ks.length)return;
- if(!confirm('Delete '+ks.map(k=>k.split('|')[0]).join(', ')+' from the list?\n\nThey disappear from this page now. A GitHub issue then opens - press Submit new issue so the delete also holds on your other devices.'))return;
- ks.forEach(k=>hid.add(k));sel.clear();sv('sthide',[...hid]);draw();
- issue('Remove Supertrend: '+ks.join(', '))};
-function drawPos(){
- const o=visibleOpen(),c=visibleClosed();let inv=0,opl=0,rpl=0;
- $('pt').innerHTML='<tr>'+['Stock','Bought on','Buy price','Qty','Current price','P/L (Rs)','P/L %','Action'].map(x=>`<th>${x}</th>`).join('')+'</tr>'+
- (o.map(p=>{const cur=p.last_close??p.buy_price,pl=(cur-p.buy_price)*p.qty;inv+=p.buy_price*p.qty;opl+=pl;
-  return`<tr><td>${link(p)}${p.pending?' <span class="nw">saving...</span>':''}</td><td>${fd(p.buy_date)}</td><td>${p.buy_price}</td><td>${p.qty}</td><td>${cur}</td><td class="${cl(pl)}">${inr(pl)}</td><td class="${cl(pl)}">${sg(100*(cur/p.buy_price-1))}%</td><td><button class="ps" data-s="${esc(p.symbol)}" data-d="${p.buy_date}" data-c="${cur}">Sell</button> <button class="pd" data-s="${esc(p.symbol)}" data-d="${p.buy_date}">Delete</button></td></tr>`}).join('')||'<tr><td colspan="8">No open trades. Tick Buy next to a stock above.</td></tr>');
- $('pc').innerHTML='<tr>'+['Stock','Bought on','Sold on','Buy price','Sell price','Qty','P/L (Rs)','P/L %','Action'].map(x=>`<th>${x}</th>`).join('')+'</tr>'+
- (c.map(p=>{const pl=(p.sell_price-p.buy_price)*p.qty;rpl+=pl;
-  return`<tr><td>${link(p)}${p.pending?' <span class="nw">saving...</span>':''}</td><td>${fd(p.buy_date)}</td><td>${fd(p.sell_date)}</td><td>${p.buy_price}</td><td>${p.sell_price}</td><td>${p.qty}</td><td class="${cl(pl)}">${inr(pl)}</td><td class="${cl(pl)}">${sg(100*(p.sell_price/p.buy_price-1))}%</td><td><button class="pd" data-s="${esc(p.symbol)}" data-d="${p.buy_date}">Delete</button></td></tr>`}).join('')||'<tr><td colspan="9">No closed trades yet.</td></tr>');
- $('pm').innerHTML=`Invested in open trades: <b>${inr(inv)}</b> | Open P/L: <b class="${cl(opl)}">${inr(opl)}</b> | Realised P/L: <b class="${cl(rpl)}">${inr(rpl)}</b> | <b>Total P/L: <span class="${cl(opl+rpl)}">${inr(opl+rpl)}</span></b>`;
- document.querySelectorAll('.ps').forEach(b=>b.onclick=()=>{const v=prompt('Sell '+b.dataset.s+' - price per share (Rs):',b.dataset.c);if(v===null)return;const px=parseFloat(v);if(!(px>0)){alert('Enter a price above 0.');return}
-  ps.push({symbol:b.dataset.s,buy_date:b.dataset.d,price:px,date:today()});sv('stsell',ps);drawPos();issue(`Sell Supertrend: ${b.dataset.s}@${b.dataset.d}@${px}`)});
- document.querySelectorAll('.pd').forEach(b=>b.onclick=()=>{if(!confirm('Delete this trade from the P/L table? Its profit or loss will no longer count.'))return;
-  pr.add(b.dataset.s+'@'+b.dataset.d);sv('strem',[...pr]);drawPos();issue(`Remove Supertrend trade: ${b.dataset.s}@${b.dataset.d}`)});
-}
-Promise.all([fetch('data/supertrend_list.json').then(r=>{if(!r.ok)throw 0;return r.json()}),fetch('data/st_positions.json').then(r=>r.ok?r.json():{open:[],closed:[]}).catch(()=>({open:[],closed:[]}))]).then(([k,p])=>{
- L=k;P=p;const cur=new Set(L.stocks.map(key));hid=new Set([...hid].filter(x=>cur.has(x)));sv('sthide',[...hid]);
- const all=P.open.concat(P.closed).map(x=>x.symbol+'@'+x.buy_date);pr=new Set([...pr].filter(x=>all.includes(x)));sv('strem',[...pr]);
- const g=L.stocks.filter(r=>r.side=='green').length,rd=L.stocks.filter(r=>r.side=='red').length;const pb2=L.stocks.filter(r=>r.pullback).length;
- $('sm').textContent=k.data_date?`${g} green and ${rd} red stocks in the list, ${pb2} in SP pullback. Prices up to ${k.data_date}; ${k.stocks_scanned} stocks scanned; ${k.new_count||0} new on the latest scan. Updated ${k.updated}.`:'No scan has run yet - run the Daily scan workflow.';
- draw()}).catch(()=>{$('sm').textContent='Not ready yet - run the Daily scan workflow.';draw()});
 })();
 </script>
 <div id="tab6" hidden>
@@ -471,9 +350,9 @@ fetch('/api/results').then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{
 </script>
 <script>
 (()=>{const $=i=>document.getElementById(i);
-const show=n=>{[1,2,3,4,5,6,7,8].forEach(i=>{const t=$('tab'+i),b=$('b'+i);if(t)t.hidden=i!=n;if(b)b.className=i==n?'on':''});history.replaceState(null,'',['','#backtest','#crossover','#funds','#vtd','#supertrend','#squeeze','#weekly','#compare'][n])};
-[1,2,3,4,5,6,7,8].forEach(i=>$('b'+i).onclick=()=>show(i));
-show({'#crossover':2,'#funds':3,'#vtd':4,'#supertrend':5,'#squeeze':6,'#weekly':7,'#compare':8}[location.hash]||1);
+const show=n=>{[1,3,4,6,7,8].forEach(i=>{const t=$('tab'+i),b=$('b'+i);if(t)t.hidden=i!=n;if(b)b.className=i==n?'on':''});history.replaceState(null,'',['','#backtest','','#funds','#vtd','','#squeeze','#weekly','#compare'][n])};
+[1,3,4,6,7,8].forEach(i=>$('b'+i).onclick=()=>show(i));
+show({'#funds':3,'#vtd':4,'#squeeze':6,'#weekly':7,'#compare':8}[location.hash]||1);
 })();
 </script>
 </body></html>
